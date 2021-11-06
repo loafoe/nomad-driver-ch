@@ -24,7 +24,7 @@ const (
 	// pluginName is the name of the plugin
 	// this is used for logging and (along with the version) for uniquely
 	// identifying plugin binaries fingerprinted by the client
-	pluginName = "hello-world-example"
+	pluginName = "containerhost"
 
 	// pluginVersion allows the client to identify and use newer versions of
 	// an installed plugin
@@ -76,7 +76,7 @@ var (
 
 	// taskConfigSpec is the specification of the plugin's configuration for
 	// a task
-	// this is used to validated the configuration specified for the plugin
+	// this is used to validate the configuration specified for the plugin
 	// when a job is submitted.
 	taskConfigSpec = hclspec.NewObject(map[string]*hclspec.Spec{
 		// TODO: define plugin's task configuration schema
@@ -329,9 +329,10 @@ func (d *HelloDriverPlugin) buildFingerprint() *drivers.Fingerprint {
 		re := regexp.MustCompile("[0-9]\\.[0-9]\\.[0-9]")
 		version := re.FindString(string(out))
 
-		fp.Attributes["driver.hello.shell_version"] = structs.NewStringAttribute(version)
-		fp.Attributes["driver.hello.shell"] = structs.NewStringAttribute(shell)
+		fp.Attributes["driver.containerhost.shell_version"] = structs.NewStringAttribute(version)
+		fp.Attributes["driver.containerhost.shell"] = structs.NewStringAttribute(shell)
 	}
+	fp.Attributes["driver.containerhost.hello"] = structs.NewStringAttribute("world")
 
 	return fp
 }

@@ -4,7 +4,7 @@ job "example" {
 
   group "example" {
     task "hello-world" {
-      driver = "hello-world-example"
+      driver = "containerhost"
 
       config {
         greeting = "hello"
