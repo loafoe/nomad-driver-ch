@@ -1,4 +1,4 @@
-module github.com/loafoe/nomad-containerhost-driver-plugin
+module github.com/loafoe/nomad-ch-driver
 
 go 1.17
 

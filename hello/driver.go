@@ -24,7 +24,7 @@ const (
 	// pluginName is the name of the plugin
 	// this is used for logging and (along with the version) for uniquely
 	// identifying plugin binaries fingerprinted by the client
-	pluginName = "containerhost"
+	pluginName = "ch"
 
 	// pluginVersion allows the client to identify and use newer versions of
 	// an installed plugin
@@ -329,10 +329,10 @@ func (d *HelloDriverPlugin) buildFingerprint() *drivers.Fingerprint {
 		re := regexp.MustCompile("[0-9]\\.[0-9]\\.[0-9]")
 		version := re.FindString(string(out))
 
-		fp.Attributes["driver.containerhost.shell_version"] = structs.NewStringAttribute(version)
-		fp.Attributes["driver.containerhost.shell"] = structs.NewStringAttribute(shell)
+		fp.Attributes["driver.ch.shell_version"] = structs.NewStringAttribute(version)
+		fp.Attributes["driver.ch.shell"] = structs.NewStringAttribute(shell)
 	}
-	fp.Attributes["driver.containerhost.hello"] = structs.NewStringAttribute("world")
+	fp.Attributes["driver.ch.hello"] = structs.NewStringAttribute("world")
 
 	return fp
 }
