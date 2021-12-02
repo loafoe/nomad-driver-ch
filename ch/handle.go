@@ -1,4 +1,4 @@
-package hello
+package ch
 
 import (
 	"context"
@@ -62,7 +62,7 @@ func (h *taskHandle) run() {
 	}
 	h.stateLock.Unlock()
 
-	// TODO: wait for your task to complete and upate its state.
+	// TODO: wait for your task to complete and update its state.
 	ps, err := h.exec.Wait(context.Background())
 	h.stateLock.Lock()
 	defer h.stateLock.Unlock()
