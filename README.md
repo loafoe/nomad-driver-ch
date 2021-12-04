@@ -1,27 +1,32 @@
-Nomad Skeleton Driver Plugin
-==========
+# Nomad Container Host (ch) Driver Plugin
 
-Skeleton project for
-[Nomad task driver plugins](https://www.nomadproject.io/docs/drivers/index.html).
+This is a [Nomad](https://www.nomadproject.io) Driver plugin that allows
+HSDP Container Host instances to function as Nomad client nodes. 
 
-This project is intended for bootstrapping development of a new task driver
-plugin.
+The initial focus focus is on getting things working on a single client.
+Once this is stable we will expand the scope of the project to cluster
+setups and possibly enabling auto scaling features.
 
-- Website: [https://www.nomadproject.io](https://www.nomadproject.io)
-- Mailing list: [Google Groups](http://groups.google.com/group/nomad-tool)
+The primary goal of this project is to build knowledge of Nomad and its
+internals and to validate Nomad as a possible alternative to Kubernetes
+which is much more complex and heavy weight. 
 
-Requirements
--------------------
+## Limitations and aspirations
 
-- [Nomad](https://www.nomadproject.io/downloads.html) v0.9+
-- [Go](https://golang.org/doc/install) v1.11 or later (to build the plugin)
+The current Container Host architecture rules out any sort of multi-tenancy
+capability of the Nomad cluster so any deployment using this driver 
+is effectively single tenant today. This is fine as there is very little overhead.
+Customers can theoretically spin up dozens of clusters. 
+Even though the driver is Container Host specific, any knowledge we gain should be
+applicable to any future hardened environment. Potentially it can also be 
+an interesting platform for on-premise or hybrid deployments.
 
-Building the Skeleton Plugin
--------------------
+# Requirements
 
-[Generate](https://github.com/hashicorp/nomad-skeleton-driver-plugin/generate)
-a new repository in your account from this template by clicking the `Use this
-template` button above.
+- [Nomad](https://www.nomadproject.io/downloads.html) v1.1+
+- [Go](https://golang.org/doc/install) v1.17 or later (to build the plugin)
+
+# Building the Plugin
 
 Clone the repository somewhere in your computer. This project uses
 [Go modules](https://blog.golang.org/using-go-modules) so you will need to set
@@ -29,56 +34,23 @@ the environment variable `GO111MODULE=on` or work outside your `GOPATH` if it
 is set to `auto` or not declared.
 
 ```sh
-$ git clone git@github.com:<ORG>/<REPO>git
-```
+$ git clone https://github.com/loafoe/nomad-ch-driver
 
 Enter the plugin directory and update the paths in `go.mod` and `main.go` to
 match your repository path.
 
-```diff
-// go.mod
-
-- module github.com/hashicorp/nomad-skeleton-driver-plugin
-+ module github.com/<ORG>/<REPO>
-...
-```
-
-```diff
-// main.go
-
-package main
-
-import (
-    log "github.com/hashicorp/go-hclog"
--   "github.com/hashicorp/nomad-skeleton-driver-plugin/hello"
-+.  "github.com/<REPO>/<ORG>/hello"
-...
-
-```
-
-Build the skeleton plugin.
+Build the plugin.
 
 ```sh
-$ make build
+$ go build .
 ```
 
 ## Deploying Driver Plugins in Nomad
 
-The initial version of the skeleton is a simple task that outputs a greeting.
-You can try it out by starting a Nomad agent and running the job provided in
-the `example` folder:
-
 ```sh
-$ make build
 $ nomad agent -dev -config=./example/agent.hcl -plugin-dir=$(pwd)
 
 # in another shell
 $ nomad run ./example/example.nomad
 $ nomad logs <ALLOCATION ID>
 ```
-
-Code Organization
--------------------
-Follow the comments marked with a `TODO` tag to implement your driver's logic.
-For more information check the
-[Nomad documentation on plugins](https://www.nomadproject.io/docs/internals/plugins/index.html).
