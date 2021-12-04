@@ -61,18 +61,21 @@ func (h *taskHandle) run() {
 		h.exitResult = &drivers.ExitResult{}
 	}
 	h.stateLock.Unlock()
-
-	_, errC := h.dockerClient.ContainerWait(context.Background(), h.containerID, container.WaitConditionNotRunning)
+	h.logger.Info("waiting for container to exit", "container_id", h.containerID)
+	waitC, errC := h.dockerClient.ContainerWait(context.Background(), h.containerID, container.WaitConditionNotRunning)
 	h.stateLock.Lock()
 	defer h.stateLock.Unlock()
-	if err := <-errC; err != nil {
+
+	select {
+	case exitStatus := <-waitC:
+		h.logger.Info("container exit message received", "exit_status", hclog.Fmt("%+v", exitStatus))
+		h.procState = drivers.TaskStateExited
+		h.exitResult.ExitCode = int(exitStatus.StatusCode)
+	case err := <-errC:
+		h.logger.Info("container wait error", "error", err.Error())
 		h.exitResult.Err = err
-		h.procState = drivers.TaskStateUnknown
-		h.completedAt = time.Now()
-		return
+		h.procState = drivers.TaskStateExited
 	}
-	h.procState = drivers.TaskStateExited
-	h.exitResult.ExitCode = 0
 	h.completedAt = time.Now()
 }
 
