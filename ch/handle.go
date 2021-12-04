@@ -2,12 +2,12 @@ package ch
 
 import (
 	"context"
-	"strconv"
 	"sync"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	docker "github.com/docker/docker/client"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/nomad/drivers/shared/executor"
 	"github.com/hashicorp/nomad/plugins/drivers"
 )
@@ -19,17 +19,17 @@ type taskHandle struct {
 	// stateLock syncs access to all fields below
 	stateLock sync.RWMutex
 
-	logger       hclog.Logger
-	exec         executor.Executor
-	pluginClient *plugin.Client
-	taskConfig   *drivers.TaskConfig
-	procState    drivers.TaskState
-	startedAt    time.Time
-	completedAt  time.Time
-	exitResult   *drivers.ExitResult
+	logger      hclog.Logger
+	exec        executor.Executor
+	taskConfig  *drivers.TaskConfig
+	procState   drivers.TaskState
+	startedAt   time.Time
+	completedAt time.Time
+	exitResult  *drivers.ExitResult
 
 	// TODO: add any extra relevant information about the task.
-	pid int
+	dockerClient *docker.Client
+	containerID  string
 }
 
 func (h *taskHandle) TaskStatus() *drivers.TaskStatus {
@@ -44,7 +44,7 @@ func (h *taskHandle) TaskStatus() *drivers.TaskStatus {
 		CompletedAt: h.completedAt,
 		ExitResult:  h.exitResult,
 		DriverAttributes: map[string]string{
-			"pid": strconv.Itoa(h.pid),
+			"container_id": h.containerID,
 		},
 	}
 }
@@ -62,19 +62,64 @@ func (h *taskHandle) run() {
 	}
 	h.stateLock.Unlock()
 
-	// TODO: wait for your task to complete and update its state.
-	ps, err := h.exec.Wait(context.Background())
+	_, errC := h.dockerClient.ContainerWait(context.Background(), h.containerID, container.WaitConditionNotRunning)
 	h.stateLock.Lock()
 	defer h.stateLock.Unlock()
-
-	if err != nil {
+	if err := <-errC; err != nil {
 		h.exitResult.Err = err
 		h.procState = drivers.TaskStateUnknown
 		h.completedAt = time.Now()
 		return
 	}
 	h.procState = drivers.TaskStateExited
-	h.exitResult.ExitCode = ps.ExitCode
-	h.exitResult.Signal = ps.Signal
-	h.completedAt = ps.Time
+	h.exitResult.ExitCode = 0
+	h.completedAt = time.Now()
+}
+
+func (h *taskHandle) stats(ctx context.Context, interval time.Duration) (<-chan *drivers.TaskResourceUsage, error) {
+	ch := make(chan *drivers.TaskResourceUsage)
+	go h.handleStats(ctx, ch, interval)
+	return ch, nil
+}
+
+func (h *taskHandle) handleStats(ctx context.Context, ch chan *drivers.TaskResourceUsage, interval time.Duration) {
+	defer close(ch)
+	timer := time.NewTimer(0)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-timer.C:
+			timer.Reset(interval)
+		}
+		_, err := h.dockerClient.ContainerStats(ctx, h.containerID, false)
+		if err != nil {
+			h.logger.Error("failed to get container cpu stats", "error", err)
+			return
+		}
+		// TODO
+		t := time.Now()
+
+		ms := &drivers.MemoryStats{
+			RSS:      0,
+			Cache:    0,
+			Swap:     0,
+			Measured: []string{},
+		}
+
+		cs := &drivers.CpuStats{}
+		taskResUsage := drivers.TaskResourceUsage{
+			ResourceUsage: &drivers.ResourceUsage{
+				CpuStats:    cs,
+				MemoryStats: ms,
+			},
+			Timestamp: t.UTC().UnixNano(),
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case ch <- &taskResUsage:
+		}
+	}
 }

@@ -13,6 +13,7 @@ replace (
 )
 
 require (
+	github.com/docker/docker v17.12.0-ce-rc1.0.20200330121334-7f8b4b621b5d+incompatible
 	github.com/hashicorp/consul-template v0.25.2
 	github.com/hashicorp/go-hclog v1.0.0
 	github.com/hashicorp/go-plugin v1.4.3
@@ -29,13 +30,17 @@ require (
 	github.com/cilium/ebpf v0.2.0 // indirect
 	github.com/container-storage-interface/spec v1.4.0 // indirect
 	github.com/containerd/console v1.0.1 // indirect
+	github.com/containerd/containerd v1.3.4 // indirect
 	github.com/containernetworking/plugins v0.7.3-0.20190501191748-2d6d46d308b2 // indirect
 	github.com/coreos/go-systemd/v22 v22.1.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3-0.20190205144030-7efe413b52e1 // indirect
-	github.com/docker/docker v17.12.0-ce-rc1.0.20200330121334-7f8b4b621b5d+incompatible // indirect
+	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-units v0.4.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/godbus/dbus/v5 v5.0.3 // indirect
+	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.1-0.20200228141219-3ce3d519df39 // indirect
 	github.com/hashicorp/consul/api v1.9.1 // indirect
@@ -70,6 +75,8 @@ require (
 	github.com/oklog/run v1.0.1-0.20180308005104-6934b124db28 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v1.0.0-rc93 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d // indirect
 	github.com/opencontainers/selinux v1.8.0 // indirect
