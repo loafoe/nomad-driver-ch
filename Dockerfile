@@ -13,4 +13,4 @@ RUN GIT_COMMIT=$(git rev-parse --short HEAD) && \
 
 FROM docker.na1.hsdp.io/loafoe/nomad:latest
 RUN mkdir -p /plugins
-COPY --from=builder /build/app /app /plugins/nomad-driver-ch
+COPY --from=builder /build/app /plugins/nomad-driver-ch
