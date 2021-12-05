@@ -19,6 +19,7 @@ require (
 	github.com/hashicorp/go-hclog v1.0.0
 	github.com/hashicorp/nomad v1.2.2
 	github.com/opencontainers/image-spec v1.0.2-0.20210730191737-8e42a01fb1b7
+	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08
 )
 
 require (
@@ -82,7 +83,6 @@ require (
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
 	golang.org/x/net v0.0.0-20211111160137-58aab5ef257a // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08 // indirect
 	golang.org/x/text v0.3.6 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20211111162719-482062a4217b // indirect
