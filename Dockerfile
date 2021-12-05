@@ -12,6 +12,9 @@ RUN GIT_COMMIT=$(git rev-parse --short HEAD) && \
 
 
 FROM docker.na1.hsdp.io/loafoe/nomad:latest
+RUN apt-get update && apt-get install -y \
+    iproute2 \
+ && rm -rf /var/lib/apt/lists/*
 RUN adduser nomad
 RUN mkdir -p /plugins
 COPY --from=builder /build/app /plugins/nomad-driver-ch
