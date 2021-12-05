@@ -25,7 +25,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/nomad/drivers/shared/executor"
 	"github.com/hashicorp/nomad/plugins/drivers"
 )
 
@@ -37,7 +36,6 @@ type taskHandle struct {
 	stateLock sync.RWMutex
 
 	logger      hclog.Logger
-	exec        executor.Executor
 	taskConfig  *drivers.TaskConfig
 	procState   drivers.TaskState
 	startedAt   time.Time
