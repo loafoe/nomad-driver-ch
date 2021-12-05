@@ -34,6 +34,7 @@ import (
 	"github.com/hashicorp/nomad/plugins/drivers"
 	"github.com/hashicorp/nomad/plugins/shared/hclspec"
 	"github.com/hashicorp/nomad/plugins/shared/structs"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -331,7 +332,7 @@ func (d *CHDriverPlugin) buildFingerprint() *drivers.Fingerprint {
 	//
 	// In the example below we check if the shell specified by the user exists
 	// in the node.
-	fp.Attributes["driver.ch.hello"] = structs.NewStringAttribute("world")
+	fp.Attributes["driver.ch.effective_uid"] = structs.NewIntAttribute(int64(unix.Geteuid()), "")
 
 	clientVersion := "unknown"
 	nrContainers := 0
@@ -341,7 +342,7 @@ func (d *CHDriverPlugin) buildFingerprint() *drivers.Fingerprint {
 			nrContainers = len(l)
 		}
 	}
-	fp.Attributes["driver.ch.client_version"] = structs.NewStringAttribute(clientVersion)
+	fp.Attributes["driver.ch.docker_client_version"] = structs.NewStringAttribute(clientVersion)
 	fp.Attributes["driver.ch.container_count"] = structs.NewIntAttribute(int64(nrContainers), "")
 	fp.Attributes["driver.ch.last_check"] = structs.NewStringAttribute(time.Now().Format(time.RFC3339))
 
