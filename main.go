@@ -20,7 +20,7 @@ package main
 import (
 	log "github.com/hashicorp/go-hclog"
 
-	"github.com/loafoe/nomad-ch-driver/ch"
+	"github.com/loafoe/nomad-driver-ch/ch"
 
 	"github.com/hashicorp/nomad/plugins"
 )

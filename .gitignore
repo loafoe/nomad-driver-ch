@@ -4,4 +4,4 @@ config.yml
 manifest.yml
 redshift.json
 *.csv
-nomad-ch-driver
+nomad-driver-ch

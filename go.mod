@@ -1,4 +1,4 @@
-module github.com/loafoe/nomad-ch-driver
+module github.com/loafoe/nomad-driver-ch
 
 go 1.17
 
