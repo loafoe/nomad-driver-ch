@@ -12,4 +12,4 @@ RUN GIT_COMMIT=$(git rev-parse --short HEAD) && \
 
 
 FROM docker.na1.hsdp.io/loafoe/nomad:latest
-COPY --from=builder /buld/app /app
+COPY --from=builder /build/app /app
