@@ -18,6 +18,7 @@ limitations under the License.
 package ch
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -27,7 +28,9 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/hashicorp/nomad/plugins/drivers"
@@ -84,11 +87,17 @@ func (d *CHDriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig
 		defer reader.Close()
 		io.Copy(os.Stdout, reader)
 	}
+	mounts, err := d.mountEntries(d.ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error setting up volume mounts: %w", err)
+	}
 
 	config := &container.Config{
 		Image: taskConfig.Image,
 	}
-	hostConfig := &container.HostConfig{}
+	hostConfig := &container.HostConfig{
+		Mounts: *mounts,
+	}
 	networkingConfig := &network.NetworkingConfig{}
 	platform := &v1.Platform{
 		Architecture: "amd64", // Hardcoded until we figure out how to configure this on-the-fly
@@ -101,4 +110,47 @@ func (d *CHDriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig
 		return nil, fmt.Errorf("eror in containerCreate: %w", err)
 	}
 	return &body, nil
+}
+
+func (d *CHDriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]mount.Mount, error) {
+	var mounts []mount.Mount
+
+	cleanup := func() {
+		for _, m := range mounts {
+			_ = d.dockerClient.VolumeRemove(ctx, m.Source, true)
+		}
+		return
+	}
+
+	mapper := []struct {
+		Name       string
+		Source     string
+		MountPoint string
+	}{
+		{"local", cfg.TaskDir().LocalDir, "/local"},
+		{"shared", cfg.TaskDir().SharedTaskDir, "/shared"},
+		{"secrets", cfg.TaskDir().SecretsDir, "/secrets"},
+	}
+	for _, m := range mapper {
+		localName := fmt.Sprintf("%s-%s", cfg.ID, m.Name)
+		_, err := d.dockerClient.VolumeCreate(ctx, volumetypes.VolumeCreateBody{
+			Driver:     "local",
+			Name:       localName,
+			DriverOpts: map[string]string{},
+			Labels: map[string]string{
+				"created_by": "nomad-driver-ch",
+			},
+		})
+		if err != nil {
+			cleanup()
+			return nil, err
+		}
+		// TODO: copy content from m.Source to new volume
+		mounts = append(mounts, mount.Mount{
+			Type:   mount.TypeVolume,
+			Source: localName,
+			Target: m.MountPoint,
+		})
+	}
+	return &mounts, nil
 }
