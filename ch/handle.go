@@ -45,6 +45,7 @@ type taskHandle struct {
 	// TODO: add any extra relevant information about the task.
 	dockerClient *docker.Client
 	containerID  string
+	chContainer  CHContainer
 }
 
 func (h *taskHandle) TaskStatus() *drivers.TaskStatus {

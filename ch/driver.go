@@ -168,13 +168,13 @@ type TaskState struct {
 	// method below.
 	Pid         int
 	ContainerID string
+	CHContainer CHContainer
 
 	stateLock sync.RWMutex
 }
 
-// CHDriverPlugin is an example driver plugin. When provisioned in a job,
-// the task will output a greet specified by the user.
-type CHDriverPlugin struct {
+// DriverPlugin is an example driver plugin. When provisioned in a job,
+type DriverPlugin struct {
 	// eventer is used to handle multiplexing of TaskEvents calls such that an
 	// event can be broadcast to all callers
 	eventer *eventer.Eventer
@@ -208,7 +208,7 @@ func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger = logger.Named(pluginName)
 
-	return &CHDriverPlugin{
+	return &DriverPlugin{
 		eventer:        eventer.NewEventer(ctx, logger),
 		config:         &Config{},
 		tasks:          newTaskStore(),
@@ -219,17 +219,17 @@ func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 }
 
 // PluginInfo returns information describing the plugin.
-func (d *CHDriverPlugin) PluginInfo() (*base.PluginInfoResponse, error) {
+func (d *DriverPlugin) PluginInfo() (*base.PluginInfoResponse, error) {
 	return pluginInfo, nil
 }
 
 // ConfigSchema returns the plugin configuration schema.
-func (d *CHDriverPlugin) ConfigSchema() (*hclspec.Spec, error) {
+func (d *DriverPlugin) ConfigSchema() (*hclspec.Spec, error) {
 	return configSpec, nil
 }
 
 // SetConfig is called by the client to pass the configuration for the plugin.
-func (d *CHDriverPlugin) SetConfig(cfg *base.Config) error {
+func (d *DriverPlugin) SetConfig(cfg *base.Config) error {
 	var config Config
 	if len(cfg.PluginConfig) != 0 {
 		if err := base.MsgPackDecode(cfg.PluginConfig, &config); err != nil {
@@ -270,25 +270,25 @@ func (d *CHDriverPlugin) SetConfig(cfg *base.Config) error {
 }
 
 // TaskConfigSchema returns the HCL schema for the configuration of a task.
-func (d *CHDriverPlugin) TaskConfigSchema() (*hclspec.Spec, error) {
+func (d *DriverPlugin) TaskConfigSchema() (*hclspec.Spec, error) {
 	return taskConfigSpec, nil
 }
 
 // Capabilities returns the features supported by the driver.
-func (d *CHDriverPlugin) Capabilities() (*drivers.Capabilities, error) {
+func (d *DriverPlugin) Capabilities() (*drivers.Capabilities, error) {
 	return capabilities, nil
 }
 
 // Fingerprint returns a channel that will be used to send health information
 // and other driver specific node attributes.
-func (d *CHDriverPlugin) Fingerprint(ctx context.Context) (<-chan *drivers.Fingerprint, error) {
+func (d *DriverPlugin) Fingerprint(ctx context.Context) (<-chan *drivers.Fingerprint, error) {
 	ch := make(chan *drivers.Fingerprint)
 	go d.handleFingerprint(ctx, ch)
 	return ch, nil
 }
 
 // handleFingerprint manages the channel and the flow of fingerprint data.
-func (d *CHDriverPlugin) handleFingerprint(ctx context.Context, ch chan<- *drivers.Fingerprint) {
+func (d *DriverPlugin) handleFingerprint(ctx context.Context, ch chan<- *drivers.Fingerprint) {
 	defer close(ch)
 
 	// Nomad expects the initial fingerprint to be sent immediately
@@ -309,7 +309,7 @@ func (d *CHDriverPlugin) handleFingerprint(ctx context.Context, ch chan<- *drive
 }
 
 // buildFingerprint returns the driver's fingerprint data
-func (d *CHDriverPlugin) buildFingerprint() *drivers.Fingerprint {
+func (d *DriverPlugin) buildFingerprint() *drivers.Fingerprint {
 	fp := &drivers.Fingerprint{
 		Attributes:        map[string]*structs.Attribute{},
 		Health:            drivers.HealthStateHealthy,
@@ -350,7 +350,7 @@ func (d *CHDriverPlugin) buildFingerprint() *drivers.Fingerprint {
 }
 
 // StartTask returns a task handle and a driver network if necessary.
-func (d *CHDriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drivers.DriverNetwork, error) {
+func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drivers.DriverNetwork, error) {
 	if _, ok := d.tasks.Get(cfg.ID); ok {
 		return nil, nil, fmt.Errorf("task with ID %q already started", cfg.ID)
 	}
@@ -369,7 +369,7 @@ func (d *CHDriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle
 		return nil, nil, err
 	}
 	cleanup := func() {
-		if err := d.dockerClient.ContainerRemove(d.ctx, c.ID, types.ContainerRemoveOptions{
+		if err := d.dockerClient.ContainerRemove(d.ctx, c.CreateBody.ID, types.ContainerRemoveOptions{
 			RemoveLinks:   true,
 			RemoveVolumes: true,
 			Force:         true,
@@ -377,14 +377,15 @@ func (d *CHDriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle
 			d.logger.Error("failed to clean up from an error in Start", "error", err)
 		}
 	}
-	if err := d.dockerClient.ContainerStart(d.ctx, c.ID, types.ContainerStartOptions{}); err != nil {
+	if err := d.dockerClient.ContainerStart(d.ctx, c.CreateBody.ID, types.ContainerStartOptions{}); err != nil {
 		cleanup()
-		return nil, nil, fmt.Errorf("unable to start container '%s': %v", c.ID, err)
+		return nil, nil, fmt.Errorf("unable to start container '%s': %v", c.CreateBody.ID, err)
 	}
 	dn := &drivers.DriverNetwork{}
 
 	h := &taskHandle{
-		containerID:  c.ID,
+		chContainer:  *c,
+		containerID:  c.CreateBody.ID,
 		taskConfig:   cfg,
 		dockerClient: d.dockerClient,
 		procState:    drivers.TaskStateRunning,
@@ -393,7 +394,8 @@ func (d *CHDriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle
 	}
 
 	driverState := TaskState{
-		ContainerID: c.ID,
+		ContainerID: c.CreateBody.ID,
+		CHContainer: *c,
 		TaskConfig:  cfg,
 		StartedAt:   h.startedAt,
 	}
@@ -408,7 +410,7 @@ func (d *CHDriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle
 }
 
 // RecoverTask recreates the in-memory state of a task from a TaskHandle.
-func (d *CHDriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
+func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 	if handle == nil {
 		return errors.New("error: handle cannot be nil")
 	}
@@ -432,6 +434,7 @@ func (d *CHDriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 	}
 
 	h := &taskHandle{
+		chContainer: taskState.CHContainer,
 		containerID: taskState.ContainerID,
 		taskConfig:  taskState.TaskConfig,
 		procState:   drivers.TaskStateRunning,
@@ -446,7 +449,7 @@ func (d *CHDriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 }
 
 // WaitTask returns a channel used to notify Nomad when a task exits.
-func (d *CHDriverPlugin) WaitTask(ctx context.Context, taskID string) (<-chan *drivers.ExitResult, error) {
+func (d *DriverPlugin) WaitTask(ctx context.Context, taskID string) (<-chan *drivers.ExitResult, error) {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return nil, drivers.ErrTaskNotFound
@@ -457,7 +460,7 @@ func (d *CHDriverPlugin) WaitTask(ctx context.Context, taskID string) (<-chan *d
 	return ch, nil
 }
 
-func (d *CHDriverPlugin) handleWait(ctx context.Context, handle *taskHandle, ch chan *drivers.ExitResult) {
+func (d *DriverPlugin) handleWait(ctx context.Context, handle *taskHandle, ch chan *drivers.ExitResult) {
 	defer close(ch)
 
 	//
@@ -489,7 +492,7 @@ func (d *CHDriverPlugin) handleWait(ctx context.Context, handle *taskHandle, ch 
 }
 
 // StopTask stops a running task with the given signal and within the timeout window.
-func (d *CHDriverPlugin) StopTask(taskID string, timeout time.Duration, signal string) error {
+func (d *DriverPlugin) StopTask(taskID string, timeout time.Duration, signal string) error {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return drivers.ErrTaskNotFound
@@ -499,7 +502,7 @@ func (d *CHDriverPlugin) StopTask(taskID string, timeout time.Duration, signal s
 }
 
 // DestroyTask cleans up and removes a task that has terminated.
-func (d *CHDriverPlugin) DestroyTask(taskID string, force bool) error {
+func (d *DriverPlugin) DestroyTask(taskID string, force bool) error {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return drivers.ErrTaskNotFound
@@ -518,7 +521,7 @@ func (d *CHDriverPlugin) DestroyTask(taskID string, force bool) error {
 }
 
 // InspectTask returns detailed status information for the referenced taskID.
-func (d *CHDriverPlugin) InspectTask(taskID string) (*drivers.TaskStatus, error) {
+func (d *DriverPlugin) InspectTask(taskID string) (*drivers.TaskStatus, error) {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return nil, drivers.ErrTaskNotFound
@@ -528,7 +531,7 @@ func (d *CHDriverPlugin) InspectTask(taskID string) (*drivers.TaskStatus, error)
 }
 
 // TaskStats returns a channel which the driver should send stats to at the given interval.
-func (d *CHDriverPlugin) TaskStats(ctx context.Context, taskID string, interval time.Duration) (<-chan *drivers.TaskResourceUsage, error) {
+func (d *DriverPlugin) TaskStats(ctx context.Context, taskID string, interval time.Duration) (<-chan *drivers.TaskResourceUsage, error) {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return nil, drivers.ErrTaskNotFound
@@ -538,13 +541,13 @@ func (d *CHDriverPlugin) TaskStats(ctx context.Context, taskID string, interval 
 }
 
 // TaskEvents returns a channel that the plugin can use to emit task related events.
-func (d *CHDriverPlugin) TaskEvents(ctx context.Context) (<-chan *drivers.TaskEvent, error) {
+func (d *DriverPlugin) TaskEvents(ctx context.Context) (<-chan *drivers.TaskEvent, error) {
 	return d.eventer.TaskEvents(ctx)
 }
 
 // SignalTask forwards a signal to a task.
 // This is an optional capability.
-func (d *CHDriverPlugin) SignalTask(taskID string, signal string) error {
+func (d *DriverPlugin) SignalTask(taskID string, signal string) error {
 	_, ok := d.tasks.Get(taskID)
 	if !ok {
 		return drivers.ErrTaskNotFound
@@ -560,7 +563,7 @@ func (d *CHDriverPlugin) SignalTask(taskID string, signal string) error {
 
 // ExecTask returns the result of executing the given command inside a task.
 // This is an optional capability.
-func (d *CHDriverPlugin) ExecTask(taskID string, cmd []string, timeout time.Duration) (*drivers.ExecTaskResult, error) {
+func (d *DriverPlugin) ExecTask(taskID string, cmd []string, timeout time.Duration) (*drivers.ExecTaskResult, error) {
 	// TODO: implement driver specific logic to execute commands in a task.
 	return nil, errors.New("this driver does not support exec")
 }

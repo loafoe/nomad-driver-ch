@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/docker/distribution/reference"
@@ -37,7 +38,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func (d *CHDriverPlugin) generateAuth(auth *RegistryAuth) string {
+func (d *DriverPlugin) generateAuth(auth *RegistryAuth) string {
 	if auth == nil || auth.Username == "" {
 		return ""
 	}
@@ -45,7 +46,9 @@ func (d *CHDriverPlugin) generateAuth(auth *RegistryAuth) string {
 	return base64.StdEncoding.EncodeToString([]byte(str))
 }
 
-func (d *CHDriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskConfig) (*container.ContainerCreateCreatedBody, error) {
+func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskConfig) (*CHContainer, error) {
+	chContainer := CHContainer{}
+
 	containerName := fmt.Sprintf("%s-%s", cfg.Name, cfg.AllocID)
 	opt := types.ImagePullOptions{}
 	ref, err := reference.ParseNormalizedNamed(taskConfig.Image)
@@ -87,21 +90,30 @@ func (d *CHDriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig
 		defer reader.Close()
 		io.Copy(os.Stdout, reader)
 	}
-	mounts, err := d.mountEntries(d.ctx, cfg)
+	mountEntries, err := d.mountEntries(d.ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up volume mounts: %w", err)
 	}
+	chContainer.Mounts = *mountEntries
 
 	config := &container.Config{
 		Image: taskConfig.Image,
 	}
+	var mounts []mount.Mount
+	for _, m := range *mountEntries {
+		mounts = append(mounts, m.Mount)
+	}
 	hostConfig := &container.HostConfig{
-		Mounts: *mounts,
+		Mounts: mounts,
 	}
 	networkingConfig := &network.NetworkingConfig{}
 	platform := &v1.Platform{
-		Architecture: "amd64", // Hardcoded until we figure out how to configure this on-the-fly
+		Architecture: runtime.GOARCH,
 		OS:           "linux",
+	}
+	// Set environment variables
+	for key, val := range cfg.Env {
+		config.Env = append(config.Env, fmt.Sprintf("%s=%s", key, val))
 	}
 
 	d.logger.Info("creating container", "container_name", containerName)
@@ -109,11 +121,26 @@ func (d *CHDriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig
 	if err != nil {
 		return nil, fmt.Errorf("eror in containerCreate: %w", err)
 	}
-	return &body, nil
+	chContainer.CreateBody = body
+
+	return &chContainer, nil
 }
 
-func (d *CHDriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]mount.Mount, error) {
-	var mounts []mount.Mount
+type CHContainer struct {
+	CreateBody container.ContainerCreateCreatedBody
+	Mounts     []CHMount
+}
+
+type CHMount struct {
+	mount.Mount
+	Name       string
+	Source     string
+	MountPoint string
+	Volume     string
+}
+
+func (d *DriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]CHMount, error) {
+	var mounts []CHMount
 
 	cleanup := func() {
 		for _, m := range mounts {
@@ -121,21 +148,15 @@ func (d *CHDriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConf
 		}
 		return
 	}
-
-	mapper := []struct {
-		Name       string
-		Source     string
-		MountPoint string
-	}{
-		{"local", cfg.TaskDir().LocalDir, "/local"},
-		{"shared", cfg.TaskDir().SharedTaskDir, "/shared"},
-		{"secrets", cfg.TaskDir().SecretsDir, "/secrets"},
+	mapper := []CHMount{
+		{Name: "local", Source: cfg.TaskDir().LocalDir, MountPoint: "/local", Volume: fmt.Sprintf("%s-local", cfg.AllocID)},
+		{Name: "shared", Source: cfg.TaskDir().SharedTaskDir, MountPoint: "/shared", Volume: fmt.Sprintf("%s-shared", cfg.TaskGroupName)},
+		{Name: "secrets", Source: cfg.TaskDir().SecretsDir, MountPoint: "/secrets", Volume: fmt.Sprintf("%s-secret", cfg.AllocID)},
 	}
 	for _, m := range mapper {
-		localName := fmt.Sprintf("%s-%s", cfg.ID, m.Name)
 		_, err := d.dockerClient.VolumeCreate(ctx, volumetypes.VolumeCreateBody{
 			Driver:     "local",
-			Name:       localName,
+			Name:       m.Volume,
 			DriverOpts: map[string]string{},
 			Labels: map[string]string{
 				"created_by": "nomad-driver-ch",
@@ -146,11 +167,12 @@ func (d *CHDriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConf
 			return nil, err
 		}
 		// TODO: copy content from m.Source to new volume
-		mounts = append(mounts, mount.Mount{
+		m.Mount = mount.Mount{
 			Type:   mount.TypeVolume,
-			Source: localName,
+			Source: m.Volume,
 			Target: m.MountPoint,
-		})
+		}
+		mounts = append(mounts, m)
 	}
 	return &mounts, nil
 }
