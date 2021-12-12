@@ -19,12 +19,15 @@ package ch
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/nomad/client/stats"
 	"github.com/hashicorp/nomad/plugins/drivers"
 )
 
@@ -34,6 +37,10 @@ import (
 type taskHandle struct {
 	// stateLock syncs access to all fields below
 	stateLock sync.RWMutex
+
+	totalCpuStats  *stats.CpuStats
+	userCpuStats   *stats.CpuStats
+	systemCpuStats *stats.CpuStats
 
 	logger      hclog.Logger
 	taskConfig  *drivers.TaskConfig
@@ -112,33 +119,26 @@ func (h *taskHandle) handleStats(ctx context.Context, ch chan *drivers.TaskResou
 		case <-timer.C:
 			timer.Reset(interval)
 		}
-		_, err := h.dockerClient.ContainerStats(ctx, h.containerID, false)
+		var decodedStats types.StatsJSON
+		containerStats, err := h.dockerClient.ContainerStats(ctx, h.containerID, false)
 		if err != nil {
 			h.logger.Error("failed to get container cpu stats", "error", err)
-			return
+			continue
 		}
-		// TODO
-		t := time.Now()
-
-		ms := &drivers.MemoryStats{
-			RSS:      0,
-			Cache:    0,
-			Swap:     0,
-			Measured: []string{},
+		decoder := json.NewDecoder(containerStats.Body)
+		err = decoder.Decode(&decodedStats)
+		if err != nil {
+			h.logger.Error("failed to decode container stats", "error", err)
+			_ = containerStats.Body.Close()
+			continue
 		}
-
-		cs := &drivers.CpuStats{}
-		taskResUsage := drivers.TaskResourceUsage{
-			ResourceUsage: &drivers.ResourceUsage{
-				CpuStats:    cs,
-				MemoryStats: ms,
-			},
-			Timestamp: t.UTC().UnixNano(),
-		}
+		_ = containerStats.Body.Close()
+		taskResUsage := h.DockerStatsToTaskResourceUsage(&decodedStats)
 		select {
 		case <-ctx.Done():
 			return
-		case ch <- &taskResUsage:
+		case ch <- taskResUsage:
+			h.logger.Info("sent usage", "cpu_percent", hclog.Fmt("%+v", taskResUsage.ResourceUsage.CpuStats.Percent))
 		}
 	}
 }

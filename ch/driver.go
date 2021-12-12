@@ -391,6 +391,10 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 		procState:    drivers.TaskStateRunning,
 		startedAt:    time.Now().Round(time.Millisecond),
 		logger:       d.logger,
+
+		totalCpuStats:  stats.NewCpuStats(),
+		userCpuStats:   stats.NewCpuStats(),
+		systemCpuStats: stats.NewCpuStats(),
 	}
 
 	driverState := TaskState{
@@ -440,6 +444,10 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 		procState:   drivers.TaskStateRunning,
 		startedAt:   taskState.StartedAt,
 		exitResult:  &drivers.ExitResult{},
+
+		totalCpuStats:  stats.NewCpuStats(),
+		userCpuStats:   stats.NewCpuStats(),
+		systemCpuStats: stats.NewCpuStats(),
 	}
 
 	d.tasks.Set(taskState.TaskConfig.ID, h)
