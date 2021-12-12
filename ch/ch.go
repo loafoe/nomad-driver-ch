@@ -88,7 +88,7 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 			return nil, fmt.Errorf("error pulling image '%s': %w", taskConfig.Image, err)
 		}
 		defer reader.Close()
-		io.Copy(os.Stdout, reader)
+		_, _ = io.Copy(os.Stdout, reader)
 	}
 	mountEntries, err := d.mountEntries(d.ctx, cfg)
 	if err != nil {
@@ -106,11 +106,17 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 	hostConfig := &container.HostConfig{
 		Mounts: mounts,
 	}
+	// Set limits
+	hostConfig.Resources.Memory = cfg.Resources.NomadResources.Memory.MemoryMB * 1024 * 1024
+	hostConfig.Resources.CPUCount = int64(runtime.NumCPU())
+	hostConfig.Resources.CPUShares = cfg.Resources.NomadResources.Cpu.CpuShares
+
 	networkingConfig := &network.NetworkingConfig{}
 	platform := &v1.Platform{
 		Architecture: runtime.GOARCH,
 		OS:           "linux",
 	}
+
 	// Set environment variables
 	for key, val := range cfg.Env {
 		config.Env = append(config.Env, fmt.Sprintf("%s=%s", key, val))

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/nomad/helper/stats"
 	"github.com/hashicorp/nomad/plugins/drivers"
 )
@@ -17,6 +18,9 @@ var (
 )
 
 func (h *taskHandle) DockerStatsToTaskResourceUsage(s *types.StatsJSON) *drivers.TaskResourceUsage {
+	if err := stats.Init(); err != nil {
+		h.logger.Info("stats error", "error", hclog.Fmt("%+v", err))
+	}
 	measuredMems := DockerCgroupV1MeasuredMemStats
 
 	ms := &drivers.MemoryStats{
@@ -43,6 +47,7 @@ func (h *taskHandle) DockerStatsToTaskResourceUsage(s *types.StatsJSON) *drivers
 		s.CPUStats.CPUUsage.UsageInUsermode, s.PreCPUStats.CPUUsage.UsageInUsermode,
 		s.CPUStats.CPUUsage.TotalUsage, s.PreCPUStats.CPUUsage.TotalUsage, runtime.NumCPU())
 	cs.TotalTicks = (cs.Percent / 100) * stats.TotalTicksAvailable() / float64(runtime.NumCPU())
+	h.logger.Info("stats calculator", "model_name", stats.CPUModelName(), "total_cpu", stats.CPUNumCores(), "mhz_per_core", stats.CPUMHzPerCore(), "total_ticks", hclog.Fmt("%+v", cs.TotalTicks), "total_ticks_available", hclog.Fmt("%f", stats.TotalTicksAvailable()))
 
 	return &drivers.TaskResourceUsage{
 		ResourceUsage: &drivers.ResourceUsage{
