@@ -122,6 +122,17 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 		config.Env = append(config.Env, fmt.Sprintf("%s=%s", key, val))
 	}
 
+	// Set command
+	if taskConfig.Command != "" {
+		// Validate command
+		if err := validateCommand(taskConfig.Command); err != nil {
+			return nil, err
+		}
+
+		cmd := []string{taskConfig.Command}
+		config.Cmd = cmd
+	}
+
 	d.logger.Info("creating container", "container_name", containerName)
 	body, err := d.dockerClient.ContainerCreate(d.ctx, config, hostConfig, networkingConfig, platform, containerName)
 	if err != nil {
@@ -181,4 +192,20 @@ func (d *DriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConfig
 		mounts = append(mounts, m)
 	}
 	return &mounts, nil
+}
+
+// validateCommand validates that the command only has a single value and
+// returns a user-friendly error message telling them to use the passed
+// argField.
+func validateCommand(command string) error {
+	trimmed := strings.TrimSpace(command)
+	if len(trimmed) == 0 {
+		return fmt.Errorf("command empty: %q", command)
+	}
+
+	if len(trimmed) != len(command) {
+		return fmt.Errorf("command contains extra white space: %q", command)
+	}
+
+	return nil
 }
