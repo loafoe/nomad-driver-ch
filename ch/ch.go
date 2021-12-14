@@ -99,6 +99,7 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 	config := &container.Config{
 		Image: taskConfig.Image,
 	}
+
 	var mounts []mount.Mount
 	for _, m := range *mountEntries {
 		mounts = append(mounts, m.Mount)
@@ -111,7 +112,22 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 	hostConfig.Resources.CPUCount = int64(runtime.NumCPU())
 	hostConfig.Resources.CPUShares = cfg.Resources.NomadResources.Cpu.CpuShares
 
+	// Networking and Ports
 	networkingConfig := &network.NetworkingConfig{}
+
+	ports := newPublishedPorts(d.logger)
+	if cfg.Resources.Ports != nil && len(taskConfig.Ports) > 0 {
+		for _, port := range taskConfig.Ports {
+			if mapping, ok := cfg.Resources.Ports.Get(port); ok {
+				ports.add(mapping.Label, mapping.HostIP, mapping.Value, mapping.To)
+			} else {
+				return nil, fmt.Errorf("port %q not found, check network stanza", port)
+			}
+		}
+	}
+	hostConfig.PortBindings = ports.publishedPorts
+	config.ExposedPorts = ports.exposedPorts
+
 	platform := &v1.Platform{
 		Architecture: runtime.GOARCH,
 		OS:           "linux",

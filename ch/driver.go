@@ -104,6 +104,7 @@ var (
 	taskConfigSpec = hclspec.NewObject(map[string]*hclspec.Spec{
 		"image":   hclspec.NewAttr("image", "string", true),
 		"command": hclspec.NewAttr("command", "string", false),
+		"ports":   hclspec.NewAttr("ports", "list(string)", false),
 		"auth": hclspec.NewBlock("auth", false, hclspec.NewObject(map[string]*hclspec.Spec{
 			"username": hclspec.NewAttr("username", "string", true),
 			"password": hclspec.NewAttr("password", "string", true),
@@ -145,6 +146,7 @@ type TaskConfig struct {
 	Image   string       `codec:"image"`
 	Command string       `codec:"command"`
 	Auth    RegistryAuth `codec:"auth"`
+	Ports   []string     `codec:"ports"`
 }
 
 // TaskState is the runtime state which is encoded in the handle returned to
