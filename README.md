@@ -36,8 +36,7 @@ is set to `auto` or not declared.
 ```sh
 $ git clone https://github.com/loafoe/nomad-driver-ch
 
-Enter the plugin directory and update the paths in `go.mod` and `main.go` to
-match your repository path.
+Enter the plugin directory.
 
 Build the plugin.
 
