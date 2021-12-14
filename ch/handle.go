@@ -158,6 +158,7 @@ func (h *taskHandle) handleStats(ctx context.Context, ch chan *drivers.TaskResou
 		case <-ctx.Done():
 			return
 		case ch <- taskResUsage:
+			h.logger.Debug("sent usage", "cpu_percent", hclog.Fmt("%+v", taskResUsage.ResourceUsage.CpuStats.Percent))
 		}
 	}
 }
