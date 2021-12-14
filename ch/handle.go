@@ -27,8 +27,11 @@ import (
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/nomad/client/stats"
+	"github.com/hashicorp/nomad/drivers/docker/docklog"
 	"github.com/hashicorp/nomad/plugins/drivers"
+	"github.com/hashicorp/nomad/plugins/shared/structs"
 )
 
 // taskHandle should store all relevant runtime information
@@ -53,6 +56,21 @@ type taskHandle struct {
 	dockerClient *docker.Client
 	containerID  string
 	chContainer  CHContainer
+
+	// dlogger
+	dlogger             docklog.DockerLogger
+	dloggerPluginClient *plugin.Client
+}
+
+func (h *taskHandle) buildState() *TaskState {
+	s := &TaskState{
+		ContainerID: h.containerID,
+		//DriverNetwork: h.net,
+	}
+	if h.dloggerPluginClient != nil {
+		s.ReattachConfig = structs.ReattachConfigFromGoPlugin(h.dloggerPluginClient.ReattachConfig())
+	}
+	return s
 }
 
 func (h *taskHandle) TaskStatus() *drivers.TaskStatus {
@@ -79,6 +97,8 @@ func (h *taskHandle) IsRunning() bool {
 }
 
 func (h *taskHandle) run() {
+	defer h.shutdownLogger()
+
 	h.stateLock.Lock()
 	if h.exitResult == nil {
 		h.exitResult = &drivers.ExitResult{}
@@ -141,4 +161,16 @@ func (h *taskHandle) handleStats(ctx context.Context, ch chan *drivers.TaskResou
 			h.logger.Info("sent usage", "cpu_percent", hclog.Fmt("%+v", taskResUsage.ResourceUsage.CpuStats.Percent))
 		}
 	}
+}
+
+func (h *taskHandle) shutdownLogger() {
+	if h.dlogger == nil {
+		return
+	}
+
+	if err := h.dlogger.Stop(); err != nil {
+		h.logger.Error("failed to stop docker logger process during StopTask",
+			"error", err, "logger_pid", h.dloggerPluginClient.ReattachConfig().Pid)
+	}
+	h.dloggerPluginClient.Kill()
 }

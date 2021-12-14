@@ -28,7 +28,9 @@ import (
 	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/nomad/client/stats"
+	"github.com/hashicorp/nomad/drivers/docker/docklog"
 	"github.com/hashicorp/nomad/drivers/shared/eventer"
 	"github.com/hashicorp/nomad/plugins/base"
 	"github.com/hashicorp/nomad/plugins/drivers"
@@ -397,6 +399,16 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 		systemCpuStats: stats.NewCpuStats(),
 	}
 
+	// dlogger
+	dlogger, pluginClient, err := d.setupNewDockerLogger(h.containerID, cfg, time.Unix(0, 0))
+	if err != nil {
+		d.logger.Error("an error occurred after container startup, terminating container", "container_id", h.containerID)
+		_ = h.dockerClient.ContainerStop(d.ctx, h.containerID, nil)
+		return nil, nil, err
+	}
+	h.dlogger = dlogger
+	h.dloggerPluginClient = pluginClient
+
 	driverState := TaskState{
 		ContainerID: c.CreateBody.ID,
 		CHContainer: *c,
@@ -448,6 +460,30 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 		totalCpuStats:  stats.NewCpuStats(),
 		userCpuStats:   stats.NewCpuStats(),
 		systemCpuStats: stats.NewCpuStats(),
+	}
+
+	// TODO: check if reattach logic is really correct. We may need to get it from the dockerlog Plugin (GetDriverState)
+
+	// dlogger
+	var err error
+	h.dlogger, h.dloggerPluginClient, err = d.reattachToDockerLogger(taskState.ReattachConfig)
+	if err != nil {
+		d.logger.Warn("failed to reattach to docker logger process", "error", err)
+
+		h.dlogger, h.dloggerPluginClient, err = d.setupNewDockerLogger(h.containerID, handle.Config, time.Now())
+		if err != nil {
+			if err := d.dockerClient.ContainerStop(d.ctx, h.containerID, nil); err != nil {
+				d.logger.Warn("failed to stop container during cleanup", "container_id", h.containerID, "error", err)
+			}
+			return fmt.Errorf("failed to setup replacement docker logger: %v", err)
+		}
+
+		if err := handle.SetDriverState(h.buildState()); err != nil {
+			if err := d.dockerClient.ContainerStop(d.ctx, h.containerID, nil); err != nil {
+				d.logger.Warn("failed to stop container during cleanup", "container_id", h.containerID, "error", err)
+			}
+			return fmt.Errorf("failed to store driver state: %v", err)
+		}
 	}
 
 	d.tasks.Set(taskState.TaskConfig.ID, h)
@@ -574,4 +610,41 @@ func (d *DriverPlugin) SignalTask(taskID string, signal string) error {
 func (d *DriverPlugin) ExecTask(taskID string, cmd []string, timeout time.Duration) (*drivers.ExecTaskResult, error) {
 	// TODO: implement driver specific logic to execute commands in a task.
 	return nil, errors.New("this driver does not support exec")
+}
+
+func (d *DriverPlugin) setupNewDockerLogger(containerID string, cfg *drivers.TaskConfig, startTime time.Time) (docklog.DockerLogger, *plugin.Client, error) {
+	dlogger, pluginClient, err := docklog.LaunchDockerLogger(d.logger)
+	if err != nil {
+		if pluginClient != nil {
+			pluginClient.Kill()
+		}
+		return nil, nil, fmt.Errorf("failed to launch docker logger plugin: %v", err)
+	}
+
+	if err := dlogger.Start(&docklog.StartOpts{
+		ContainerID: containerID,
+		TTY:         false,
+		Stdout:      cfg.StdoutPath,
+		Stderr:      cfg.StderrPath,
+		StartTime:   startTime.Unix(),
+	}); err != nil {
+		pluginClient.Kill()
+		return nil, nil, fmt.Errorf("failed to launch docker logger process %s: %v", containerID, err)
+	}
+
+	return dlogger, pluginClient, nil
+}
+
+func (d *DriverPlugin) reattachToDockerLogger(reattachConfig *structs.ReattachConfig) (docklog.DockerLogger, *plugin.Client, error) {
+	reattach, err := structs.ReattachConfigToGoPlugin(reattachConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dlogger, dloggerPluginClient, err := docklog.ReattachDockerLogger(reattach)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to reattach to docker logger process: %v", err)
+	}
+
+	return dlogger, dloggerPluginClient, nil
 }
