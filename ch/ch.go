@@ -129,7 +129,7 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 			return nil, err
 		}
 
-		cmd := []string{taskConfig.Command}
+		cmd := strings.Split(taskConfig.Command, " ")
 		config.Cmd = cmd
 	}
 
