@@ -3,7 +3,7 @@
 This is a [Nomad](https://www.nomadproject.io) Driver plugin that allows
 HSDP Container Host instances to function as Nomad client nodes. 
 
-The initial focus focus is on getting things working on a single client.
+The initial focus is on getting things working on a single client.
 Once this is stable we will expand the scope of the project to cluster
 setups and possibly enabling auto scaling features.
 
