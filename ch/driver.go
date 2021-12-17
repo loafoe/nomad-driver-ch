@@ -688,7 +688,7 @@ func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (strin
 			"container_id", c.CreateBody.ID,
 			"container_network", ipName)
 	}
-	d.logger.Debug("IP detection complete", "ip_address", ip)
+	d.logger.Info("IP detection complete", "ip_address", ip)
 
 	return ip, true // For Container Host, always auto advertise for now
 }
