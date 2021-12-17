@@ -427,6 +427,20 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 		StartedAt:   h.startedAt,
 	}
 
+	// Change allocated IP
+	if handle.Config.Resources.Ports != nil {
+		h.logger.Info("remapping IP address of allocated ports")
+		ports := handle.Config.Resources.Ports
+		for i := 0; i < len(*ports); i++ {
+			oldIP := (*ports)[i].HostIP
+			port := (*ports)[i].Value
+			(*ports)[i].HostIP = ip
+			h.logger.Info("remapped port", "old_ip", oldIP, "new_ip", ip, "port", hclog.Fmt("%+v", port))
+		}
+	} else {
+		h.logger.Info("no allocated ports found")
+	}
+
 	if err := handle.SetDriverState(&driverState); err != nil {
 		return nil, nil, fmt.Errorf("failed to set driver state: %v", err)
 	}
@@ -460,6 +474,14 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 		return fmt.Errorf("failed to start task from handle: %v", err)
 	}
 
+	// Detect container address
+	ip, autoUse := d.detectIP(&taskState.CHContainer, &driverConfig)
+	net := &drivers.DriverNetwork{
+		//PortMap:       driverConfig.PortMap,
+		IP:            ip,
+		AutoAdvertise: autoUse,
+	}
+
 	h := &taskHandle{
 		chContainer: taskState.CHContainer,
 		containerID: taskState.ContainerID,
@@ -467,6 +489,7 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 		procState:   drivers.TaskStateRunning,
 		startedAt:   taskState.StartedAt,
 		exitResult:  &drivers.ExitResult{},
+		net:         net,
 
 		totalCpuStats:  stats.NewCpuStats(),
 		userCpuStats:   stats.NewCpuStats(),
