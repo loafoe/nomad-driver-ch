@@ -672,7 +672,6 @@ func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (strin
 	}
 
 	ip, ipName := "", ""
-	auto := false
 	for name, net := range inspect.NetworkSettings.Networks {
 		if net.IPAddress == "" {
 			// Ignore networks without an IP address
@@ -680,13 +679,6 @@ func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (strin
 		}
 		ip = net.IPAddress
 		ipName = name
-
-		// Don't auto-advertise IPs for default networks (bridge on
-		// Linux, nat on Windows)
-		if name != "bridge" && name != "nat" {
-			auto = true
-		}
-
 		break
 	}
 
@@ -696,6 +688,7 @@ func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (strin
 			"container_id", c.CreateBody.ID,
 			"container_network", ipName)
 	}
+	d.logger.Debug("IP detection complete", "ip_address", ip)
 
-	return ip, auto
+	return ip, true // For Container Host, always auto advertise for now
 }
