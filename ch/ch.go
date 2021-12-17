@@ -119,7 +119,7 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 	if cfg.Resources.Ports != nil && len(taskConfig.Ports) > 0 {
 		for _, port := range taskConfig.Ports {
 			if mapping, ok := cfg.Resources.Ports.Get(port); ok {
-				ports.add(mapping.Label, "0.0.0.0", mapping.Value, mapping.To) // mapping.HostIP
+				ports.add(mapping.Label, mapping.HostIP, mapping.Value, mapping.To) // mapping.HostIP
 			} else {
 				return nil, fmt.Errorf("port %q not found, check network stanza", port)
 			}
