@@ -385,7 +385,6 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 		cleanup()
 		return nil, nil, fmt.Errorf("unable to start container '%s': %v", c.CreateBody.ID, err)
 	}
-	dn := &drivers.DriverNetwork{}
 
 	// dlogger
 	dlogger, pluginClient, err := d.setupNewDockerLogger(c.CreateBody.ID, cfg, time.Unix(0, 0))
@@ -427,27 +426,13 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 		StartedAt:   h.startedAt,
 	}
 
-	// Change allocated IP
-	if handle.Config.Resources.Ports != nil {
-		h.logger.Info("remapping IP address of allocated ports")
-		ports := handle.Config.Resources.Ports
-		for i := 0; i < len(*ports); i++ {
-			oldIP := (*ports)[i].HostIP
-			port := (*ports)[i].Value
-			(*ports)[i].HostIP = ip
-			h.logger.Info("remapped port", "old_ip", oldIP, "new_ip", ip, "port", hclog.Fmt("%+v", port))
-		}
-	} else {
-		h.logger.Info("no allocated ports found")
-	}
-
 	if err := handle.SetDriverState(&driverState); err != nil {
 		return nil, nil, fmt.Errorf("failed to set driver state: %v", err)
 	}
 
 	d.tasks.Set(cfg.ID, h)
 	go h.run()
-	return handle, dn, nil
+	return handle, net, nil
 }
 
 // RecoverTask recreates the in-memory state of a task from a TaskHandle.
