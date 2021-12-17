@@ -51,6 +51,7 @@ type taskHandle struct {
 	startedAt   time.Time
 	completedAt time.Time
 	exitResult  *drivers.ExitResult
+	net         *drivers.DriverNetwork
 
 	// TODO: add any extra relevant information about the task.
 	dockerClient *docker.Client
@@ -87,6 +88,7 @@ func (h *taskHandle) TaskStatus() *drivers.TaskStatus {
 		DriverAttributes: map[string]string{
 			"container_id": h.containerID,
 		},
+		NetworkOverride: h.net,
 	}
 }
 

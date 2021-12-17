@@ -387,29 +387,38 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 	}
 	dn := &drivers.DriverNetwork{}
 
+	// dlogger
+	dlogger, pluginClient, err := d.setupNewDockerLogger(c.CreateBody.ID, cfg, time.Unix(0, 0))
+	if err != nil {
+		d.logger.Error("an error occurred after container startup, terminating container", "container_id", c.CreateBody.ID)
+		_ = d.dockerClient.ContainerStop(d.ctx, c.CreateBody.ID, nil)
+		return nil, nil, err
+	}
+
+	// Detect container address
+	ip, autoUse := d.detectIP(c, &driverConfig)
+	net := &drivers.DriverNetwork{
+		//PortMap:       driverConfig.PortMap,
+		IP:            ip,
+		AutoAdvertise: autoUse,
+	}
+
 	h := &taskHandle{
-		chContainer:  *c,
-		containerID:  c.CreateBody.ID,
-		taskConfig:   cfg,
-		dockerClient: d.dockerClient,
-		procState:    drivers.TaskStateRunning,
-		startedAt:    time.Now().Round(time.Millisecond),
-		logger:       d.logger,
+		chContainer:         *c,
+		containerID:         c.CreateBody.ID,
+		taskConfig:          cfg,
+		dockerClient:        d.dockerClient,
+		procState:           drivers.TaskStateRunning,
+		startedAt:           time.Now().Round(time.Millisecond),
+		logger:              d.logger,
+		dlogger:             dlogger,
+		dloggerPluginClient: pluginClient,
+		net:                 net,
 
 		totalCpuStats:  stats.NewCpuStats(),
 		userCpuStats:   stats.NewCpuStats(),
 		systemCpuStats: stats.NewCpuStats(),
 	}
-
-	// dlogger
-	dlogger, pluginClient, err := d.setupNewDockerLogger(h.containerID, cfg, time.Unix(0, 0))
-	if err != nil {
-		d.logger.Error("an error occurred after container startup, terminating container", "container_id", h.containerID)
-		_ = h.dockerClient.ContainerStop(d.ctx, h.containerID, nil)
-		return nil, nil, err
-	}
-	h.dlogger = dlogger
-	h.dloggerPluginClient = pluginClient
 
 	driverState := TaskState{
 		ContainerID: c.CreateBody.ID,
@@ -649,4 +658,44 @@ func (d *DriverPlugin) reattachToDockerLogger(reattachConfig *structs.ReattachCo
 	}
 
 	return dlogger, dloggerPluginClient, nil
+}
+
+// detectIP of Docker container. Returns the first IP found as well as true if
+// the IP should be advertised (bridge network IPs return false). Returns an
+// empty string and false if no IP could be found.
+func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (string, bool) {
+
+	inspect, err := d.dockerClient.ContainerInspect(d.ctx, c.CreateBody.ID)
+	if err != nil {
+		d.logger.Error("failed to inspect container while trying to detect IP", "container_id", c.CreateBody.ID)
+		return "", false
+	}
+
+	ip, ipName := "", ""
+	auto := false
+	for name, net := range inspect.NetworkSettings.Networks {
+		if net.IPAddress == "" {
+			// Ignore networks without an IP address
+			continue
+		}
+		ip = net.IPAddress
+		ipName = name
+
+		// Don't auto-advertise IPs for default networks (bridge on
+		// Linux, nat on Windows)
+		if name != "bridge" && name != "nat" {
+			auto = true
+		}
+
+		break
+	}
+
+	if n := len(inspect.NetworkSettings.Networks); n > 1 {
+		d.logger.Warn("multiple Docker networks for container found but Nomad only supports 1",
+			"total_networks", n,
+			"container_id", c.CreateBody.ID,
+			"container_network", ipName)
+	}
+
+	return ip, auto
 }
