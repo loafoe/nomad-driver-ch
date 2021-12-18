@@ -433,7 +433,7 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 	}
 	// Mirror connections
 	if listeners, err := d.setupMirrorListeners(handle, ip); err != nil {
-		return nil, nil, fmt.Errorf("failed to set up listenners: %w", err)
+		return nil, nil, fmt.Errorf("failed to set up listeners: %w", err)
 	} else {
 		h.listeners = listeners
 	}
@@ -511,6 +511,12 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 			}
 			return fmt.Errorf("failed to store driver state: %v", err)
 		}
+	}
+	// Mirror connections
+	if listeners, err := d.setupMirrorListeners(handle, ip); err != nil {
+		return fmt.Errorf("failed to set up listeners: %w", err)
+	} else {
+		h.listeners = listeners
 	}
 
 	d.tasks.Set(taskState.TaskConfig.ID, h)
