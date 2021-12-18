@@ -36,6 +36,7 @@ import (
 	"github.com/hashicorp/nomad/plugins/drivers"
 	"github.com/hashicorp/nomad/plugins/shared/hclspec"
 	"github.com/hashicorp/nomad/plugins/shared/structs"
+	"github.com/loafoe/nomad-driver-ch/mirror"
 	"golang.org/x/sys/unix"
 )
 
@@ -121,6 +122,7 @@ var (
 		// https://godoc.org/github.com/hashicorp/nomad/plugins/drivers#Capabilities
 		SendSignals: true,
 		Exec:        false,
+		RemoteTasks: true,
 	}
 )
 
@@ -429,6 +431,12 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 	if err := handle.SetDriverState(&driverState); err != nil {
 		return nil, nil, fmt.Errorf("failed to set driver state: %v", err)
 	}
+	// Mirror connections
+	if listeners, err := d.setupMirrorListeners(handle, ip); err != nil {
+		return nil, nil, fmt.Errorf("failed to set up listenners: %w", err)
+	} else {
+		h.listeners = listeners
+	}
 
 	d.tasks.Set(cfg.ID, h)
 	go h.run()
@@ -699,4 +707,29 @@ func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (strin
 	d.logger.Info("IP detection complete", "ip_address", ip)
 
 	return ip, true // For Container Host, always auto advertise for now
+}
+
+func (d *DriverPlugin) setupMirrorListeners(handle *drivers.TaskHandle, containerIP string) ([]chan bool, error) {
+	var listeners []chan bool
+	if handle.Config.Resources.Ports == nil || len(*handle.Config.Resources.Ports) == 0 {
+		return listeners, nil
+	}
+	cleanup := func() {
+		for _, x := range listeners {
+			x <- true
+		}
+	}
+	for _, p := range *handle.Config.Resources.Ports {
+		localServerHost := fmt.Sprintf("%s:%d", p.HostIP, p.Value)
+		remoteServerHost := fmt.Sprintf("%s:%d", containerIP, p.Value)
+		d.logger.Info("starting listener", "local", hclog.Fmt("%+v", localServerHost), "remote", hclog.Fmt("%+v", remoteServerHost))
+		doneChan, err := mirror.Start(d.logger, localServerHost, remoteServerHost)
+		if err != nil {
+			d.logger.Error("error starting listener", "error", hclog.Fmt("%+v", err), "port", hclog.Fmt("%+v", p.Value))
+			cleanup()
+			return []chan bool{}, nil // Don't error out for now
+		}
+		listeners = append(listeners, doneChan)
+	}
+	return listeners, nil
 }

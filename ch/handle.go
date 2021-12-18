@@ -61,6 +61,9 @@ type taskHandle struct {
 	// dlogger
 	dlogger             docklog.DockerLogger
 	dloggerPluginClient *plugin.Client
+
+	// mirror
+	listeners []chan bool
 }
 
 func (h *taskHandle) buildState() *TaskState {
@@ -100,6 +103,7 @@ func (h *taskHandle) IsRunning() bool {
 
 func (h *taskHandle) run() {
 	defer h.shutdownLogger()
+	defer h.shutdownMirrorListeners()
 
 	h.stateLock.Lock()
 	if h.exitResult == nil {
@@ -162,6 +166,15 @@ func (h *taskHandle) handleStats(ctx context.Context, ch chan *drivers.TaskResou
 		case ch <- taskResUsage:
 			h.logger.Debug("sent usage", "cpu_percent", hclog.Fmt("%+v", taskResUsage.ResourceUsage.CpuStats.Percent))
 		}
+	}
+}
+
+func (h *taskHandle) shutdownMirrorListeners() {
+	if h.listeners == nil {
+		return
+	}
+	for _, l := range h.listeners {
+		l <- true
 	}
 }
 
