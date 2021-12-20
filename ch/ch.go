@@ -142,6 +142,9 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 
 	// Set environment variables
 	for key, val := range cfg.Env {
+		if skipOverride(key) {
+			continue
+		}
 		config.Env = append(config.Env, fmt.Sprintf("%s=%s", key, val))
 	}
 
@@ -230,4 +233,15 @@ func validateCommand(command string) error {
 	}
 
 	return nil
+}
+
+// skipOverride determines whether the environment variable (key) needs an override or not.
+func skipOverride(key string) bool {
+	skipOverrideList := []string{"PATH"}
+	for _, k := range skipOverrideList {
+		if key == k {
+			return true
+		}
+	}
+	return false
 }
