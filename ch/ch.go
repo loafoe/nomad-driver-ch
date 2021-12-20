@@ -105,7 +105,8 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 		mounts = append(mounts, m.Mount)
 	}
 	hostConfig := &container.HostConfig{
-		Mounts: mounts,
+		Runtime: d.config.Runtime,
+		Mounts:  mounts,
 	}
 	// Set limits
 	hostConfig.Resources.Memory = cfg.Resources.NomadResources.Memory.MemoryMB * 1000 * 1000

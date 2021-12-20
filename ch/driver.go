@@ -79,6 +79,10 @@ var (
 			hclspec.NewAttr("enabled", "bool", false),
 			hclspec.NewLiteral("true"),
 		),
+		"runtime": hclspec.NewDefault(
+			hclspec.NewAttr("runtime", "string", false),
+			hclspec.NewLiteral(`"runc"`),
+		),
 		// TODO: define plugin's agent configuration schema.
 		//
 		// The schema should be defined using HCL specs and it will be used to
@@ -92,10 +96,6 @@ var (
 		//       shell = "fish"
 		//     }
 		//   }
-		"shell": hclspec.NewDefault(
-			hclspec.NewAttr("shell", "string", false),
-			hclspec.NewLiteral(`"bash"`),
-		),
 	})
 
 	// taskConfigSpec is the specification of the plugin's configuration for
@@ -128,12 +128,8 @@ var (
 
 // Config contains configuration information for the plugin
 type Config struct {
-	// TODO: create decoded plugin configuration struct
-	//
-	// This struct is the decoded version of the schema defined in the
-	// configSpec variable above. It's used to convert the HCL configuration
-	// passed by the Nomad agent into Go contructs.
-	Shell string `codec:"shell"`
+	Enabled bool   `codec:"enabled"`
+	Runtime string `codec:"runtime"`
 }
 
 // RegistryAuth info to pull image from registry.
@@ -257,8 +253,8 @@ func (d *DriverPlugin) SetConfig(cfg *base.Config) error {
 	// supported by the plugin.
 	dockerClient, err := docker.NewClientWithOpts(docker.FromEnv)
 	if err != nil {
-		return fmt.Errorf("Error creating client (%s): %v\n", os.Getenv("DOCKER_HOST"), err)
 		dockerClient = nil
+		return fmt.Errorf("Error creating client (%s): %v\n", os.Getenv("DOCKER_HOST"), err)
 	}
 	d.dockerClient = dockerClient
 
@@ -322,9 +318,6 @@ func (d *DriverPlugin) buildFingerprint() *drivers.Fingerprint {
 		HealthDescription: drivers.DriverHealthy,
 	}
 
-	// TODO: implement fingerprinting logic to populate health and driver
-	// attributes.
-	//
 	// Fingerprinting is used by the plugin to relay two important information
 	// to Nomad: health state and node attributes.
 	//
@@ -350,8 +343,7 @@ func (d *DriverPlugin) buildFingerprint() *drivers.Fingerprint {
 	}
 	fp.Attributes["driver.ch.docker_client_version"] = structs.NewStringAttribute(clientVersion)
 	fp.Attributes["driver.ch.container_count"] = structs.NewIntAttribute(int64(nrContainers), "")
-	fp.Attributes["driver.ch.last_check"] = structs.NewStringAttribute(time.Now().Format(time.RFC3339))
-
+	fp.Attributes["driver.ch.runtime"] = structs.NewStringAttribute(d.config.Runtime)
 	return fp
 }
 
