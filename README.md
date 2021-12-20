@@ -35,6 +35,7 @@ is set to `auto` or not declared.
 
 ```sh
 $ git clone https://github.com/loafoe/nomad-driver-ch
+```
 
 Enter the plugin directory.
 
