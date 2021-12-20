@@ -72,7 +72,9 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 		if err != nil {
 			return nil, fmt.Errorf("cannot open local file for storing image: %w", err)
 		}
-		defer dest.Close()
+		defer func() {
+			_ = dest.Close()
+		}()
 		err = crane.Save(image, taskConfig.Image, dest.Name())
 		if err != nil {
 			return nil, fmt.Errorf("error saving image to '%s': %w", dest.Name(), err)
@@ -81,13 +83,17 @@ func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig T
 		if err != nil {
 			return nil, fmt.Errorf("error loading image: %w", err)
 		}
-		defer lr.Body.Close()
+		defer func() {
+			_ = lr.Body.Close()
+		}()
 	} else {
 		reader, err := d.dockerClient.ImagePull(d.ctx, taskConfig.Image, opt)
 		if err != nil {
 			return nil, fmt.Errorf("error pulling image '%s': %w", taskConfig.Image, err)
 		}
-		defer reader.Close()
+		defer func() {
+			_ = reader.Close()
+		}()
 		_, _ = io.Copy(os.Stdout, reader)
 	}
 	mountEntries, err := d.mountEntries(d.ctx, cfg)
@@ -180,7 +186,6 @@ func (d *DriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConfig
 		for _, m := range mounts {
 			_ = d.dockerClient.VolumeRemove(ctx, m.Source, true)
 		}
-		return
 	}
 	mapper := []CHMount{
 		{Name: "local", Source: cfg.TaskDir().LocalDir, MountPoint: "/local", Volume: fmt.Sprintf("%s-local", cfg.AllocID)},

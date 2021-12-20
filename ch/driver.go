@@ -253,7 +253,6 @@ func (d *DriverPlugin) SetConfig(cfg *base.Config) error {
 	// supported by the plugin.
 	dockerClient, err := docker.NewClientWithOpts(docker.FromEnv)
 	if err != nil {
-		dockerClient = nil
 		return fmt.Errorf("Error creating client (%s): %v\n", os.Getenv("DOCKER_HOST"), err)
 	}
 	d.dockerClient = dockerClient
@@ -389,7 +388,7 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 	}
 
 	// Detect container address
-	ip, autoUse := d.detectIP(c, &driverConfig)
+	ip, autoUse := d.detectIP(c)
 	net := &drivers.DriverNetwork{
 		//PortMap:       driverConfig.PortMap,
 		IP:            ip,
@@ -460,7 +459,7 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 	}
 
 	// Detect container address
-	ip, autoUse := d.detectIP(&taskState.CHContainer, &driverConfig)
+	ip, autoUse := d.detectIP(&taskState.CHContainer)
 	net := &drivers.DriverNetwork{
 		//PortMap:       driverConfig.PortMap,
 		IP:            ip,
@@ -677,7 +676,7 @@ func (d *DriverPlugin) reattachToDockerLogger(reattachConfig *structs.ReattachCo
 // detectIP of Docker container. Returns the first IP found as well as true if
 // the IP should be advertised (bridge network IPs return false). Returns an
 // empty string and false if no IP could be found.
-func (d *DriverPlugin) detectIP(c *CHContainer, driverConfig *TaskConfig) (string, bool) {
+func (d *DriverPlugin) detectIP(c *CHContainer) (string, bool) {
 
 	inspect, err := d.dockerClient.ContainerInspect(d.ctx, c.CreateBody.ID)
 	if err != nil {

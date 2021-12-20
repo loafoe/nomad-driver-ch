@@ -18,12 +18,9 @@ func Start(logger hclog.Logger, localServerHost, remoteServerHost string) (chan 
 
 	go func() {
 		go func() { // Out of band close listener
-			select {
-			case <-done:
-				logger.Debug("closing listener")
-				_ = ln.Close()
-				return
-			}
+			<-done
+			logger.Debug("closing listener")
+			_ = ln.Close()
 		}()
 		for {
 			conn, err := ln.Accept()
@@ -41,8 +38,12 @@ func Start(logger hclog.Logger, localServerHost, remoteServerHost string) (chan 
 }
 
 func forward(src, dest net.Conn) {
-	defer src.Close()
-	defer dest.Close()
+	defer func() {
+		_ = src.Close()
+	}()
+	defer func() {
+		_ = dest.Close()
+	}()
 	_, _ = io.Copy(src, dest)
 }
 
