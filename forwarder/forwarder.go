@@ -1,4 +1,4 @@
-package mirror
+package forwarder
 
 import (
 	"io"
@@ -13,14 +13,14 @@ func Start(logger hclog.Logger, localServerHost, remoteServerHost string) (chan 
 		return nil, err
 	}
 
-	logger.Info("port forwarding server up", "local_server", localServerHost, "remote_server", remoteServerHost)
+	logger.Debug("port forwarding server up", "local_server", localServerHost, "remote_server", remoteServerHost)
 	done := make(chan bool)
 
 	go func() {
 		go func() { // Out of band close listener
 			select {
 			case <-done:
-				logger.Info("closing listener")
+				logger.Debug("closing listener")
 				_ = ln.Close()
 				return
 			}
@@ -48,14 +48,14 @@ func forward(src, dest net.Conn) {
 
 func handleConnection(logger hclog.Logger, remoteServerHost string, c net.Conn) error {
 
-	logger.Info("handling connection", "from", c.RemoteAddr())
+	logger.Debug("handling connection", "from", c.RemoteAddr())
 
 	remote, err := net.Dial("tcp", remoteServerHost)
 	if err != nil {
 		return err
 	}
 
-	logger.Info("connection established", "to", remoteServerHost)
+	logger.Debug("connection established", "to", remoteServerHost)
 
 	// go routines to initiate bidirectional communication for local server with a
 	// remote server

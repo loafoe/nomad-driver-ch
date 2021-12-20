@@ -36,7 +36,7 @@ import (
 	"github.com/hashicorp/nomad/plugins/drivers"
 	"github.com/hashicorp/nomad/plugins/shared/hclspec"
 	"github.com/hashicorp/nomad/plugins/shared/structs"
-	"github.com/loafoe/nomad-driver-ch/mirror"
+	"github.com/loafoe/nomad-driver-ch/forwarder"
 	"golang.org/x/sys/unix"
 )
 
@@ -721,7 +721,7 @@ func (d *DriverPlugin) setupMirrorListeners(handle *drivers.TaskHandle, containe
 		localServerHost := fmt.Sprintf("%s:%d", p.HostIP, p.Value)
 		remoteServerHost := fmt.Sprintf("%s:%d", containerIP, p.Value)
 		d.logger.Info("starting listener", "local", hclog.Fmt("%+v", localServerHost), "remote", hclog.Fmt("%+v", remoteServerHost))
-		doneChan, err := mirror.Start(d.logger, localServerHost, remoteServerHost)
+		doneChan, err := forwarder.Start(d.logger, localServerHost, remoteServerHost)
 		if err != nil {
 			d.logger.Error("error starting listener", "error", hclog.Fmt("%+v", err), "port", hclog.Fmt("%+v", p.Value))
 			cleanup()

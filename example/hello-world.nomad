@@ -36,8 +36,8 @@ job "hello-world" {
       }
 
       resources {
-        cpu    = 500
-        memory = 128
+        cpu    = 800
+        memory = 512
       }
     }
   }
