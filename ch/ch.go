@@ -237,7 +237,7 @@ func validateCommand(command string) error {
 
 // skipOverride determines whether the environment variable (key) needs an override or not.
 func skipOverride(key string) bool {
-	skipOverrideList := []string{"PATH"}
+	skipOverrideList := []string{"PATH", "DOCKER_HOST", "HOME", "HOSTNAME"}
 	for _, k := range skipOverrideList {
 		if key == k {
 			return true
