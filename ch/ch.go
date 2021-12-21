@@ -38,7 +38,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func (d *DriverPlugin) generateAuth(auth *RegistryAuth) string {
+func (d *Driver) generateAuth(auth *RegistryAuth) string {
 	if auth == nil || auth.Username == "" {
 		return ""
 	}
@@ -46,7 +46,7 @@ func (d *DriverPlugin) generateAuth(auth *RegistryAuth) string {
 	return base64.StdEncoding.EncodeToString([]byte(str))
 }
 
-func (d *DriverPlugin) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskConfig) (*CHContainer, error) {
+func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskConfig) (*CHContainer, error) {
 	chContainer := CHContainer{}
 
 	containerName := fmt.Sprintf("%s-%s", cfg.Name, cfg.AllocID)
@@ -182,7 +182,7 @@ type CHMount struct {
 	Volume     string
 }
 
-func (d *DriverPlugin) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]CHMount, error) {
+func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]CHMount, error) {
 	var mounts []CHMount
 
 	cleanup := func() {

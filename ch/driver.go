@@ -21,12 +21,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/nomad/client/stats"
@@ -175,8 +177,8 @@ type TaskState struct {
 	stateLock sync.RWMutex
 }
 
-// DriverPlugin is an example driver plugin. When provisioned in a job,
-type DriverPlugin struct {
+// Driver is an example driver plugin. When provisioned in a job,
+type Driver struct {
 	// eventer is used to handle multiplexing of TaskEvents calls such that an
 	// event can be broadcast to all callers
 	eventer *eventer.Eventer
@@ -210,7 +212,7 @@ func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger = logger.Named(pluginName)
 
-	return &DriverPlugin{
+	return &Driver{
 		eventer:        eventer.NewEventer(ctx, logger),
 		config:         &Config{},
 		tasks:          newTaskStore(),
@@ -221,17 +223,17 @@ func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 }
 
 // PluginInfo returns information describing the plugin.
-func (d *DriverPlugin) PluginInfo() (*base.PluginInfoResponse, error) {
+func (d *Driver) PluginInfo() (*base.PluginInfoResponse, error) {
 	return pluginInfo, nil
 }
 
 // ConfigSchema returns the plugin configuration schema.
-func (d *DriverPlugin) ConfigSchema() (*hclspec.Spec, error) {
+func (d *Driver) ConfigSchema() (*hclspec.Spec, error) {
 	return configSpec, nil
 }
 
 // SetConfig is called by the client to pass the configuration for the plugin.
-func (d *DriverPlugin) SetConfig(cfg *base.Config) error {
+func (d *Driver) SetConfig(cfg *base.Config) error {
 	var config Config
 	if len(cfg.PluginConfig) != 0 {
 		if err := base.MsgPackDecode(cfg.PluginConfig, &config); err != nil {
@@ -271,25 +273,25 @@ func (d *DriverPlugin) SetConfig(cfg *base.Config) error {
 }
 
 // TaskConfigSchema returns the HCL schema for the configuration of a task.
-func (d *DriverPlugin) TaskConfigSchema() (*hclspec.Spec, error) {
+func (d *Driver) TaskConfigSchema() (*hclspec.Spec, error) {
 	return taskConfigSpec, nil
 }
 
 // Capabilities returns the features supported by the driver.
-func (d *DriverPlugin) Capabilities() (*drivers.Capabilities, error) {
+func (d *Driver) Capabilities() (*drivers.Capabilities, error) {
 	return capabilities, nil
 }
 
 // Fingerprint returns a channel that will be used to send health information
 // and other driver specific node attributes.
-func (d *DriverPlugin) Fingerprint(ctx context.Context) (<-chan *drivers.Fingerprint, error) {
+func (d *Driver) Fingerprint(ctx context.Context) (<-chan *drivers.Fingerprint, error) {
 	ch := make(chan *drivers.Fingerprint)
 	go d.handleFingerprint(ctx, ch)
 	return ch, nil
 }
 
 // handleFingerprint manages the channel and the flow of fingerprint data.
-func (d *DriverPlugin) handleFingerprint(ctx context.Context, ch chan<- *drivers.Fingerprint) {
+func (d *Driver) handleFingerprint(ctx context.Context, ch chan<- *drivers.Fingerprint) {
 	defer close(ch)
 
 	// Nomad expects the initial fingerprint to be sent immediately
@@ -310,7 +312,7 @@ func (d *DriverPlugin) handleFingerprint(ctx context.Context, ch chan<- *drivers
 }
 
 // buildFingerprint returns the driver's fingerprint data
-func (d *DriverPlugin) buildFingerprint() *drivers.Fingerprint {
+func (d *Driver) buildFingerprint() *drivers.Fingerprint {
 	fp := &drivers.Fingerprint{
 		Attributes:        map[string]*structs.Attribute{},
 		Health:            drivers.HealthStateHealthy,
@@ -347,7 +349,7 @@ func (d *DriverPlugin) buildFingerprint() *drivers.Fingerprint {
 }
 
 // StartTask returns a task handle and a driver network if necessary.
-func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drivers.DriverNetwork, error) {
+func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drivers.DriverNetwork, error) {
 	if _, ok := d.tasks.Get(cfg.ID); ok {
 		return nil, nil, fmt.Errorf("task with ID %q already started", cfg.ID)
 	}
@@ -435,7 +437,7 @@ func (d *DriverPlugin) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, 
 }
 
 // RecoverTask recreates the in-memory state of a task from a TaskHandle.
-func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
+func (d *Driver) RecoverTask(handle *drivers.TaskHandle) error {
 	if handle == nil {
 		return errors.New("error: handle cannot be nil")
 	}
@@ -517,7 +519,7 @@ func (d *DriverPlugin) RecoverTask(handle *drivers.TaskHandle) error {
 }
 
 // WaitTask returns a channel used to notify Nomad when a task exits.
-func (d *DriverPlugin) WaitTask(ctx context.Context, taskID string) (<-chan *drivers.ExitResult, error) {
+func (d *Driver) WaitTask(ctx context.Context, taskID string) (<-chan *drivers.ExitResult, error) {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return nil, drivers.ErrTaskNotFound
@@ -528,7 +530,7 @@ func (d *DriverPlugin) WaitTask(ctx context.Context, taskID string) (<-chan *dri
 	return ch, nil
 }
 
-func (d *DriverPlugin) handleWait(ctx context.Context, handle *taskHandle, ch chan *drivers.ExitResult) {
+func (d *Driver) handleWait(ctx context.Context, handle *taskHandle, ch chan *drivers.ExitResult) {
 	defer close(ch)
 
 	//
@@ -560,7 +562,7 @@ func (d *DriverPlugin) handleWait(ctx context.Context, handle *taskHandle, ch ch
 }
 
 // StopTask stops a running task with the given signal and within the timeout window.
-func (d *DriverPlugin) StopTask(taskID string, timeout time.Duration, signal string) error {
+func (d *Driver) StopTask(taskID string, timeout time.Duration, signal string) error {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return drivers.ErrTaskNotFound
@@ -570,7 +572,7 @@ func (d *DriverPlugin) StopTask(taskID string, timeout time.Duration, signal str
 }
 
 // DestroyTask cleans up and removes a task that has terminated.
-func (d *DriverPlugin) DestroyTask(taskID string, force bool) error {
+func (d *Driver) DestroyTask(taskID string, force bool) error {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return drivers.ErrTaskNotFound
@@ -589,7 +591,7 @@ func (d *DriverPlugin) DestroyTask(taskID string, force bool) error {
 }
 
 // InspectTask returns detailed status information for the referenced taskID.
-func (d *DriverPlugin) InspectTask(taskID string) (*drivers.TaskStatus, error) {
+func (d *Driver) InspectTask(taskID string) (*drivers.TaskStatus, error) {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return nil, drivers.ErrTaskNotFound
@@ -599,7 +601,7 @@ func (d *DriverPlugin) InspectTask(taskID string) (*drivers.TaskStatus, error) {
 }
 
 // TaskStats returns a channel which the driver should send stats to at the given interval.
-func (d *DriverPlugin) TaskStats(ctx context.Context, taskID string, interval time.Duration) (<-chan *drivers.TaskResourceUsage, error) {
+func (d *Driver) TaskStats(ctx context.Context, taskID string, interval time.Duration) (<-chan *drivers.TaskResourceUsage, error) {
 	handle, ok := d.tasks.Get(taskID)
 	if !ok {
 		return nil, drivers.ErrTaskNotFound
@@ -609,13 +611,13 @@ func (d *DriverPlugin) TaskStats(ctx context.Context, taskID string, interval ti
 }
 
 // TaskEvents returns a channel that the plugin can use to emit task related events.
-func (d *DriverPlugin) TaskEvents(ctx context.Context) (<-chan *drivers.TaskEvent, error) {
+func (d *Driver) TaskEvents(ctx context.Context) (<-chan *drivers.TaskEvent, error) {
 	return d.eventer.TaskEvents(ctx)
 }
 
 // SignalTask forwards a signal to a task.
 // This is an optional capability.
-func (d *DriverPlugin) SignalTask(taskID string, signal string) error {
+func (d *Driver) SignalTask(taskID string, signal string) error {
 	_, ok := d.tasks.Get(taskID)
 	if !ok {
 		return drivers.ErrTaskNotFound
@@ -629,14 +631,146 @@ func (d *DriverPlugin) SignalTask(taskID string, signal string) error {
 	return errors.New("this driver does not support signalling")
 }
 
+var _ drivers.ExecTaskStreamingDriver = (*Driver)(nil)
+
 // ExecTask returns the result of executing the given command inside a task.
 // This is an optional capability.
-func (d *DriverPlugin) ExecTask(taskID string, cmd []string, timeout time.Duration) (*drivers.ExecTaskResult, error) {
+func (d *Driver) ExecTask(taskID string, cmd []string, timeout time.Duration) (*drivers.ExecTaskResult, error) {
 	// TODO: implement driver specific logic to execute commands in a task.
 	return nil, errors.New("this driver does not support exec")
 }
 
-func (d *DriverPlugin) setupNewDockerLogger(containerID string, cfg *drivers.TaskConfig, startTime time.Time) (docklog.DockerLogger, *plugin.Client, error) {
+func (d *Driver) ExecTaskStreaming(ctx context.Context, taskID string, opts *drivers.ExecOptions) (*drivers.ExitResult, error) {
+	defer func() {
+		_ = opts.Stdout.Close()
+	}()
+	defer func() {
+		_ = opts.Stderr.Close()
+	}()
+
+	done := make(chan interface{})
+	defer close(done)
+
+	h, ok := d.tasks.Get(taskID)
+	if !ok {
+		return nil, drivers.ErrTaskNotFound
+	}
+
+	if len(opts.Command) == 0 {
+		return nil, fmt.Errorf("command is required but was empty")
+	}
+
+	createExecConfig := types.ExecConfig{
+		AttachStderr: true,
+		AttachStdout: true,
+		AttachStdin:  true,
+		Tty:          opts.Tty,
+		Cmd:          opts.Command,
+	}
+
+	exec, err := h.dockerClient.ContainerExecCreate(ctx, h.containerID, createExecConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create exec: %v", err)
+	}
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case s, ok := <-opts.ResizeCh:
+				if !ok {
+					return
+				}
+				_ = h.dockerClient.ContainerExecResize(ctx, exec.ID, types.ResizeOptions{Height: uint(s.Height), Width: uint(s.Width)})
+			}
+		}
+	}()
+
+	err = h.dockerClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{
+		Detach: false,
+		Tty:    opts.Tty,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start exec: %w", err)
+	}
+	containerConn, err := h.dockerClient.ContainerExecAttach(ctx, exec.ID, types.ExecStartCheck{
+		Detach: false,
+		Tty:    opts.Tty,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to attach: %w", err)
+	}
+	err = d.execPipe(containerConn, opts.Stdin, opts.Stdout, opts.Stderr)
+	if err != nil {
+		return nil, fmt.Errorf("error in pipe: %w", err)
+	}
+
+	const execTerminatingTimeout = 3 * time.Second
+	start := time.Now()
+	var res types.ContainerExecInspect
+	for (res.Running) && time.Since(start) <= execTerminatingTimeout {
+		res, err = h.dockerClient.ContainerExecInspect(ctx, exec.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inspect exec result: %w", err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if res.Running {
+		return nil, fmt.Errorf("failed to retrieve exec result")
+	}
+	return &drivers.ExitResult{
+		ExitCode: res.ExitCode,
+	}, nil
+}
+
+func (d *Driver) execPipe(containerConn types.HijackedResponse, inStream io.Reader, outStream, errorStream io.Writer) error {
+	var err error
+	receiveStdout := make(chan error, 1)
+	if outStream != nil || errorStream != nil {
+		go func() {
+			// always do this because we are never tty
+			_, err = stdcopy.StdCopy(outStream, errorStream, containerConn.Reader)
+			d.logger.Debug("[hijack] End of stdout")
+			receiveStdout <- err
+		}()
+	}
+
+	stdinDone := make(chan struct{})
+	go func() {
+		if inStream != nil {
+			_, _ = io.Copy(containerConn.Conn, inStream)
+			d.logger.Debug("[hijack] End of stdin")
+		}
+
+		if err := containerConn.CloseWrite(); err != nil {
+			d.logger.Error("couldn't send EOF", "error", err)
+		}
+		close(stdinDone)
+	}()
+
+	select {
+	case err := <-receiveStdout:
+		if err != nil {
+			d.logger.Debug("error receiveStdout", "error", err)
+			return err
+		}
+	case <-stdinDone:
+		if outStream != nil || errorStream != nil {
+			if err := <-receiveStdout; err != nil {
+				d.logger.Debug("error receiveStdout", "error", err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (d *Driver) setupNewDockerLogger(containerID string, cfg *drivers.TaskConfig, startTime time.Time) (docklog.DockerLogger, *plugin.Client, error) {
 	dlogger, pluginClient, err := docklog.LaunchDockerLogger(d.logger)
 	if err != nil {
 		if pluginClient != nil {
@@ -659,7 +793,7 @@ func (d *DriverPlugin) setupNewDockerLogger(containerID string, cfg *drivers.Tas
 	return dlogger, pluginClient, nil
 }
 
-func (d *DriverPlugin) reattachToDockerLogger(reattachConfig *structs.ReattachConfig) (docklog.DockerLogger, *plugin.Client, error) {
+func (d *Driver) reattachToDockerLogger(reattachConfig *structs.ReattachConfig) (docklog.DockerLogger, *plugin.Client, error) {
 	reattach, err := structs.ReattachConfigToGoPlugin(reattachConfig)
 	if err != nil {
 		return nil, nil, err
@@ -676,7 +810,7 @@ func (d *DriverPlugin) reattachToDockerLogger(reattachConfig *structs.ReattachCo
 // detectIP of Docker container. Returns the first IP found as well as true if
 // the IP should be advertised (bridge network IPs return false). Returns an
 // empty string and false if no IP could be found.
-func (d *DriverPlugin) detectIP(c *CHContainer) (string, bool) {
+func (d *Driver) detectIP(c *CHContainer) (string, bool) {
 
 	inspect, err := d.dockerClient.ContainerInspect(d.ctx, c.CreateBody.ID)
 	if err != nil {
@@ -706,7 +840,7 @@ func (d *DriverPlugin) detectIP(c *CHContainer) (string, bool) {
 	return ip, true // For Container Host, always auto advertise for now
 }
 
-func (d *DriverPlugin) setupMirrorListeners(handle *drivers.TaskHandle, containerIP string) ([]chan bool, error) {
+func (d *Driver) setupMirrorListeners(handle *drivers.TaskHandle, containerIP string) ([]chan bool, error) {
 	var listeners []chan bool
 	if handle.Config.Resources.Ports == nil || len(*handle.Config.Resources.Ports) == 0 {
 		return listeners, nil
