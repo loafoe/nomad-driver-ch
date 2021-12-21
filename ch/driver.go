@@ -28,7 +28,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/nomad/client/stats"
@@ -733,7 +732,8 @@ func (d *Driver) execPipe(containerConn types.HijackedResponse, inStream io.Read
 	if outStream != nil || errorStream != nil {
 		go func() {
 			// always do this because we are never tty
-			_, err = stdcopy.StdCopy(outStream, errorStream, containerConn.Reader)
+			//_, err = stdcopy.StdCopy(outStream, errorStream, containerConn.Reader)
+			_, err = io.Copy(outStream, containerConn.Reader)
 			d.logger.Debug("[hijack] End of stdout")
 			receiveStdout <- err
 		}()
