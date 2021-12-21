@@ -688,13 +688,6 @@ func (d *Driver) ExecTaskStreaming(ctx context.Context, taskID string, opts *dri
 		}
 	}()
 
-	err = h.dockerClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{
-		Detach: false,
-		Tty:    opts.Tty,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to start exec: %w", err)
-	}
 	containerConn, err := h.dockerClient.ContainerExecAttach(ctx, exec.ID, types.ExecStartCheck{
 		Detach: false,
 		Tty:    opts.Tty,
