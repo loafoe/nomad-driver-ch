@@ -13,7 +13,8 @@ job "hello-world" {
 
       service {
          tags = [
-		"${node.unique.name}-urlprefix-/dump"
+                "${node.unique.name}-urlprefix-test-finer-lark.eu-west.philips-healthsuite.com/",
+                "${node.unique.name}-urlprefix-test-finer-lark.eu-west.philips-healthsuite.com:4443/"
 	 ]
          port = "http"
 
@@ -36,8 +37,8 @@ job "hello-world" {
       }
 
       resources {
-        cpu    = 800
-        memory = 512
+        cpu    = 500
+        memory = 128
       }
     }
   }
