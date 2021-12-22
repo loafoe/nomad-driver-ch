@@ -13,6 +13,7 @@ RUN GIT_COMMIT=$(git rev-parse --short HEAD) && \
 
 FROM docker.na1.hsdp.io/loafoe/nomad:latest
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     iproute2 \
  && rm -rf /var/lib/apt/lists/*
 RUN adduser nomad
