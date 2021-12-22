@@ -180,6 +180,7 @@ type CHMount struct {
 	Source     string
 	MountPoint string
 	Volume     string
+	Sync       bool
 }
 
 func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]CHMount, error) {
@@ -191,9 +192,9 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 		}
 	}
 	mapper := []CHMount{
-		{Name: "local", Source: cfg.TaskDir().LocalDir, MountPoint: "/local", Volume: fmt.Sprintf("%s-local", cfg.AllocID)},
-		{Name: "shared", Source: cfg.TaskDir().SharedTaskDir, MountPoint: "/shared", Volume: fmt.Sprintf("%s-shared", cfg.TaskGroupName)},
-		{Name: "secrets", Source: cfg.TaskDir().SecretsDir, MountPoint: "/secrets", Volume: fmt.Sprintf("%s-secret", cfg.AllocID)},
+		{Name: "local", Source: cfg.TaskDir().LocalDir, MountPoint: "/local", Volume: fmt.Sprintf("%s-local", cfg.AllocID), Sync: true},
+		{Name: "shared", Source: cfg.TaskDir().SharedTaskDir, MountPoint: "/shared", Volume: fmt.Sprintf("%s-shared", cfg.TaskGroupName), Sync: false},
+		{Name: "secrets", Source: cfg.TaskDir().SecretsDir, MountPoint: "/secrets", Volume: fmt.Sprintf("%s-secret", cfg.AllocID), Sync: true},
 	}
 	for _, m := range mapper {
 		_, err := d.dockerClient.VolumeCreate(ctx, volumetypes.VolumeCreateBody{
@@ -208,7 +209,6 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 			cleanup()
 			return nil, err
 		}
-		// TODO: copy content from m.Source to new volume
 		m.Mount = mount.Mount{
 			Type:   mount.TypeVolume,
 			Source: m.Volume,
@@ -216,6 +216,43 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 		}
 		mounts = append(mounts, m)
 	}
+	// Set up copy container
+	var dockerMounts []mount.Mount
+	for _, m := range mounts {
+		dockerMounts = append(dockerMounts, m.Mount)
+	}
+	d.logger.Debug("-------------------- starting sync --------------------")
+	resp, err := d.dockerClient.ContainerCreate(ctx, &container.Config{
+		Cmd: []string{"/bin/true"},
+	}, &container.HostConfig{
+		Mounts: dockerMounts,
+	}, &network.NetworkingConfig{}, &v1.Platform{
+		Architecture: runtime.GOARCH,
+		OS:           "linux",
+	}, "alpine")
+	if err != nil {
+		d.logger.Error("failed to set up copy container", "error", err.Error())
+		return &mounts, nil
+	}
+	// Copy content from m.Source to new volume
+	for _, m := range mounts {
+		if !m.Sync {
+			continue
+		}
+		source := fmt.Sprintf("%s/", m.Source)
+		destination := fmt.Sprintf("%s:/", resp.ID)
+		d.logger.Info("copying data to volumes", "source", source, "destination", destination)
+		err = runCopy(d.dockerClient, copyOptions{
+			source:      source,
+			destination: destination,
+			quiet:       true,
+		})
+		if err != nil {
+			d.logger.Error("failed to sync volume", "error", err.Error())
+		}
+	}
+	_ = d.dockerClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
+	d.logger.Debug("-------------------- done with sync --------------------")
 	return &mounts, nil
 }
 

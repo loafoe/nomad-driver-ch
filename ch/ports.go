@@ -1,3 +1,5 @@
+// Copied from: https://github.com/hashicorp/nomad/blob/main/drivers/docker/driver.go
+
 package ch
 
 import (
