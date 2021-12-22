@@ -34,6 +34,7 @@ import (
 	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/uuid"
 	"github.com/hashicorp/nomad/plugins/drivers"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -222,17 +223,19 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 		dockerMounts = append(dockerMounts, m.Mount)
 	}
 	d.logger.Debug("-------------------- starting sync --------------------")
+	copyName := fmt.Sprintf("alpine-copier-%s", uuid.NewString())
 	resp, err := d.dockerClient.ContainerCreate(ctx, &container.Config{
-		Cmd: []string{"/bin/true"},
+		Cmd:   []string{"/bin/true"},
+		Image: "alpine",
 	}, &container.HostConfig{
 		Mounts: dockerMounts,
 	}, &network.NetworkingConfig{}, &v1.Platform{
 		Architecture: runtime.GOARCH,
 		OS:           "linux",
-	}, "alpine")
+	}, copyName)
 	if err != nil {
 		d.logger.Error("failed to set up copy container", "error", err.Error())
-		return &mounts, nil
+		return nil, err
 	}
 	// Copy content from m.Source to new volume
 	for _, m := range mounts {
