@@ -17,6 +17,7 @@ require (
 	github.com/docker/docker v20.10.10+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/google/go-containerregistry v0.7.0
+	github.com/google/uuid v1.2.0
 	github.com/hashicorp/go-hclog v1.0.0
 	github.com/hashicorp/go-plugin v1.4.3
 	github.com/hashicorp/nomad v1.2.2
