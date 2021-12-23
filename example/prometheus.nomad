@@ -76,7 +76,7 @@ EOH
 		"--storage.tsdb.path=/shared/prometheus",
                 "--config.file=/local/prometheus.yml"
 	]
-        mounts = [
+        mapping = [
           "shared:/prometheus"
         ]
 

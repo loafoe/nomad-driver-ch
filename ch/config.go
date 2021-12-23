@@ -79,9 +79,9 @@ var (
 			"username": hclspec.NewAttr("username", "string", true),
 			"password": hclspec.NewAttr("password", "string", true),
 		})),
-		"copy":   hclspec.NewAttr("copy", "list(string)", false),
-		"args":   hclspec.NewAttr("args", "list(string)", false),
-		"mounts": hclspec.NewAttr("mounts", "list(string)", false),
+		"copy":    hclspec.NewAttr("copy", "list(string)", false),
+		"args":    hclspec.NewAttr("args", "list(string)", false),
+		"mapping": hclspec.NewAttr("mapping", "list(string)", false),
 	})
 
 	// capabilities indicates what optional features this driver supports
@@ -120,5 +120,5 @@ type TaskConfig struct {
 	Ports      []string     `codec:"ports"`
 	Copy       []string     `codec:"copy"`
 	Args       []string     `codec:"args"`
-	Mounts     []string     `codec:"mounts"`
+	Mapping    []string     `codec:"mapping"`
 }

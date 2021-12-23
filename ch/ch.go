@@ -223,7 +223,7 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig, task
 	}
 	// Check if we need to override the defaults
 	reMapper := make(map[string]string)
-	for _, r := range taskConfig.Mounts {
+	for _, r := range taskConfig.Mapping {
 		split := strings.Split(r, ":")
 		if len(split) != 2 {
 			continue
@@ -306,7 +306,7 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig, task
 			quiet:       true,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to sync volume: %w", err)
+			d.logger.Error("failed to sync volume", "error", err.Error())
 		}
 	}
 	d.logger.Debug("-------------------- done with sync --------------------")
