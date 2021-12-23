@@ -112,6 +112,7 @@ var (
 			"password": hclspec.NewAttr("password", "string", true),
 		})),
 		"copy": hclspec.NewAttr("copy", "list(string)", false),
+		"args": hclspec.NewAttr("args", "list(string)", false),
 	})
 
 	// capabilities indicates what optional features this driver supports
@@ -148,6 +149,7 @@ type TaskConfig struct {
 	Auth    RegistryAuth `codec:"auth"`
 	Ports   []string     `codec:"ports"`
 	Copy    []string     `codec:"copy"`
+	Args    []string     `codec:"args"`
 }
 
 // TaskState is the runtime state which is encoded in the handle returned to

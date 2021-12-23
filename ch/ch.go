@@ -166,8 +166,14 @@ func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskCon
 			return nil, err
 		}
 
-		cmd := strings.Split(taskConfig.Command, " ")
+		cmd := []string{taskConfig.Command}
+		if len(taskConfig.Args) != 0 {
+			cmd = append(cmd, taskConfig.Args...)
+		}
+		d.logger.Debug("setting container startup command", "command", strings.Join(cmd, " "))
 		config.Cmd = cmd
+	} else if len(taskConfig.Args) != 0 {
+		config.Cmd = taskConfig.Args
 	}
 
 	d.logger.Info("creating container", "container_name", containerName)
