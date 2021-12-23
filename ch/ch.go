@@ -107,7 +107,7 @@ func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskCon
 		}()
 		_, _ = io.Copy(os.Stdout, reader)
 	}
-	mountEntries, err := d.mountEntries(d.ctx, cfg)
+	mountEntries, err := d.mountEntries(d.ctx, cfg, taskConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up volume mounts: %w", err)
 	}
@@ -208,7 +208,7 @@ type CHMount struct {
 	Sync       bool
 }
 
-func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]CHMount, error) {
+func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig, taskConfig TaskConfig) (*[]CHMount, error) {
 	var mounts []CHMount
 
 	cleanup := func() {
@@ -218,9 +218,19 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 	}
 	mapper := []CHMount{
 		{Name: "local", Source: cfg.TaskDir().LocalDir, MountPoint: "/local", Volume: fmt.Sprintf("%s-local", cfg.AllocID), Sync: true},
-		{Name: "shared", Source: cfg.TaskDir().SharedTaskDir, MountPoint: "/shared", Volume: fmt.Sprintf("%s-shared", cfg.TaskGroupName), Sync: false},
+		{Name: "shared", Source: cfg.TaskDir().SharedTaskDir, MountPoint: "/shared", Volume: fmt.Sprintf("%s-shared", cfg.TaskGroupName), Sync: true},
 		{Name: "secrets", Source: cfg.TaskDir().SecretsDir, MountPoint: "/secrets", Volume: fmt.Sprintf("%s-secret", cfg.AllocID), Sync: true},
 	}
+	// Check if we need to override the defaults
+	reMapper := make(map[string]string)
+	for _, r := range taskConfig.Mounts {
+		split := strings.Split(r, ":")
+		if len(split) != 2 {
+			continue
+		}
+		reMapper[split[0]] = split[1]
+	}
+
 	for _, m := range mapper {
 		_, err := d.dockerClient.VolumeCreate(ctx, volumetypes.VolumeCreateBody{
 			Driver:     "local",
@@ -234,10 +244,16 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 			cleanup()
 			return nil, err
 		}
+
+		// NOTE: remapping is done here only
+		mountPoint := m.MountPoint
+		if remapped, ok := reMapper[m.Name]; ok {
+			mountPoint = remapped
+		}
 		m.Mount = mount.Mount{
 			Type:   mount.TypeVolume,
 			Source: m.Volume,
-			Target: m.MountPoint,
+			Target: mountPoint,
 		}
 		mounts = append(mounts, m)
 	}

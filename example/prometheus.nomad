@@ -52,18 +52,18 @@ scrape_configs:
     params:
       format: ['prometheus']
 
- - job_name : 'generic_metrics'
-   consul_sd_configs:
-   - server: '{{ env "CONSUL_REGISTRY_ADDR" }}'
+  - job_name : 'generic_metrics'
+    consul_sd_configs:
+    - server: '{{ env "CONSUL_REGISTRY_ADDR" }}'
 
-   relabel_configs:
-   - source_labels: ['__meta_consul_tags']
-     regex: '(.*)metrics(.*)'
-     action: keep
+    relabel_configs:
+    - source_labels: ['__meta_consul_tags']
+      regex: '(.*)metrics(.*)'
+      action: keep
 
-   scrape_interval: 5s
-   metrics_path: /metrics
-   params:
+    scrape_interval: 5s
+    metrics_path: /metrics
+    params:
       format: ['prometheus']
 EOH
       }
@@ -72,9 +72,12 @@ EOH
 
       config {
         image = "prom/prometheus:latest"
-
-        copy = [
-          "local/prometheus.yml:/etc/prometheus/prometheus.yml",
+	args = [
+		"--storage.tsdb.path=/shared/prometheus",
+                "--config.file=/local/prometheus.yml"
+	]
+        mounts = [
+          "shared:/prometheus"
         ]
 
         ports = ["prometheus_ui"]
