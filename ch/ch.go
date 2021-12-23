@@ -114,7 +114,8 @@ func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskCon
 	chContainer.Mounts = *mountEntries
 
 	config := &container.Config{
-		Image: taskConfig.Image,
+		Image:      taskConfig.Image,
+		Entrypoint: taskConfig.Entrypoint,
 	}
 
 	var mounts []mount.Mount
