@@ -218,6 +218,15 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 		mounts = append(mounts, m)
 	}
 	// Set up copy container
+	reader, err := d.dockerClient.ImagePull(ctx, "alpine", types.ImagePullOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error pulling image '%s': %w", "alpine", err)
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	_, _ = io.Copy(os.Stdout, reader)
+
 	var dockerMounts []mount.Mount
 	for _, m := range mounts {
 		dockerMounts = append(dockerMounts, m.Mount)
