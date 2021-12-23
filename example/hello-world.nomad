@@ -12,13 +12,21 @@ job "hello-world" {
       driver = "ch"
 
       service {
-         tags = [
-                "${node.unique.name}-urlprefix-test-finer-lark.eu-west.philips-healthsuite.com/",
-                "${node.unique.name}-urlprefix-test-finer-lark.eu-west.philips-healthsuite.com:4443/"
-	 ]
-         port = "http"
+         port = "9001"
+         meta {
+           meta = "metrics"
+         }
+         address_mode = "driver"
+      }
 
-	 address_mode = "host"
+      service {
+         tags = [
+                "${node.unique.name}-urlprefix-test-${HOSTNAME_POSTFIX}/",
+                "${node.unique.name}-urlprefix-test-${HOSTNAME_POSTFIX}:4443/"
+	 ]
+         port = "8080"
+
+	 address_mode = "driver"
 
          meta {
            meta = "for your service"
@@ -30,7 +38,11 @@ job "hello-world" {
           timeout  = "2s"
         }
       }
-      
+     
+      env {
+        PORT = "8080"
+      }
+ 
       config {
         image = "loafoe/go-hello-world:v0.4.0"
         ports = ["http"]
