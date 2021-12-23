@@ -18,10 +18,13 @@ limitations under the License.
 package ch
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
@@ -38,6 +41,12 @@ import (
 	"github.com/hashicorp/nomad/plugins/drivers"
 	"github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+//go:embed nomad-copier-amd64.tar
+var nomadCopierAMD64 []byte
+
+//go:embed nomad-copier-arm64.tar
+var nomadCopierARM64 []byte
 
 func (d *Driver) generateAuth(auth *RegistryAuth) string {
 	if auth == nil || auth.Username == "" {
@@ -218,24 +227,26 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 		mounts = append(mounts, m)
 	}
 	// Set up copy container
-	reader, err := d.dockerClient.ImagePull(ctx, "alpine", types.ImagePullOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error pulling image '%s': %w", "alpine", err)
+	copier := bytes.NewReader(nomadCopierAMD64)
+	if runtime.GOARCH == "arm64" {
+		copier = bytes.NewReader(nomadCopierARM64)
 	}
-	defer func() {
-		_ = reader.Close()
-	}()
-	_, _ = io.Copy(os.Stdout, reader)
+	loadResp, err := d.dockerClient.ImageLoad(ctx, copier, false)
+	if err != nil {
+		return nil, fmt.Errorf("error loading image: %w", err)
+	}
+	_, _ = ioutil.ReadAll(loadResp.Body)
+	_ = loadResp.Body.Close()
 
 	var dockerMounts []mount.Mount
 	for _, m := range mounts {
 		dockerMounts = append(dockerMounts, m.Mount)
 	}
 	d.logger.Debug("-------------------- starting sync --------------------")
-	copyName := fmt.Sprintf("alpine-copier-%s", uuid.NewString())
+	copyName := fmt.Sprintf("nomad-copier-%s", uuid.NewString())
 	resp, err := d.dockerClient.ContainerCreate(ctx, &container.Config{
 		Cmd:   []string{"/bin/true"},
-		Image: "alpine",
+		Image: "nomad-copier",
 	}, &container.HostConfig{
 		Mounts: dockerMounts,
 	}, &network.NetworkingConfig{}, &v1.Platform{
