@@ -12,14 +12,14 @@ job "hello-world" {
       driver = "ch"
 
       service {
+         name = "hello-world-metrics"
          port = "9001"
-         meta {
-           meta = "metrics"
-         }
+         tags = ["metrics"]
          address_mode = "driver"
       }
 
       service {
+         name = "hello-world"
          tags = [
                 "${node.unique.name}-urlprefix-test-${HOSTNAME_POSTFIX}/",
                 "${node.unique.name}-urlprefix-test-${HOSTNAME_POSTFIX}:4443/"
