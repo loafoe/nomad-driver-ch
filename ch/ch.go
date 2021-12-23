@@ -35,6 +35,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	volumetypes "github.com/docker/docker/api/types/volume"
+	docker "github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/uuid"
@@ -176,6 +177,13 @@ func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskCon
 	}
 	chContainer.CreateBody = body
 
+	// local copy to container
+	err = localToContainer(d.dockerClient, body.ID, cfg, taskConfig.Copy)
+	if err != nil {
+		_ = d.dockerClient.ContainerRemove(d.ctx, body.ID, types.ContainerRemoveOptions{Force: true})
+		return nil, err
+	}
+
 	return &chContainer, nil
 }
 
@@ -257,6 +265,10 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 		d.logger.Error("failed to set up copy container", "error", err.Error())
 		return nil, err
 	}
+	defer func() {
+		_ = d.dockerClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
+	}()
+
 	// Copy content from m.Source to new volume
 	for _, m := range mounts {
 		if !m.Sync {
@@ -271,12 +283,37 @@ func (d *Driver) mountEntries(ctx context.Context, cfg *drivers.TaskConfig) (*[]
 			quiet:       true,
 		})
 		if err != nil {
-			d.logger.Error("failed to sync volume", "error", err.Error())
+			return nil, fmt.Errorf("failed to sync volume: %w", err)
 		}
 	}
-	_ = d.dockerClient.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
 	d.logger.Debug("-------------------- done with sync --------------------")
 	return &mounts, nil
+}
+
+func localToContainer(client *docker.Client, containerID string, cfg *drivers.TaskConfig, copy []string) error {
+	// Copy operations to container
+	for _, c := range copy {
+		split := strings.Split(c, ":")
+		if len(split) != 2 {
+			continue
+		}
+		relativePath := split[0]
+		containerDest := split[1]
+		if !strings.HasPrefix(relativePath, relativePath) {
+			return fmt.Errorf("only 'local' is supported as a copy source, requested: %s", relativePath)
+		}
+		source := fmt.Sprintf("%s/%s", cfg.TaskDir().LocalDir, strings.Replace(relativePath, "local/", "", 1))
+		destination := fmt.Sprintf("%s:%s", containerID, containerDest)
+		err := runCopy(client, copyOptions{
+			source:      source,
+			destination: destination,
+			quiet:       true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to copy '%s' to '%s': %w", source, destination, err)
+		}
+	}
+	return nil
 }
 
 // validateCommand validates that the command only has a single value and
