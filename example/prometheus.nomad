@@ -73,8 +73,8 @@ EOH
       config {
         image = "prom/prometheus:latest"
 	args = [
-		"--storage.tsdb.path=/shared/prometheus",
-                "--config.file=/local/prometheus.yml"
+                "--config.file=/local/prometheus.yml",
+                "--enable-feature=remote-write-receiver"
 	]
         mapping = [
           "shared:/prometheus"

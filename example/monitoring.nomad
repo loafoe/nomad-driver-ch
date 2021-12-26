@@ -11,8 +11,8 @@ job "metrics" {
 
             service {
                 tags = [
-                  "${node.unique.name}-urlprefix-grafana-finer-lark.eu-west.philips-healthsuite.com/",
-                  "${node.unique.name}-urlprefix-grafana-finer-lark.eu-west.philips-healthsuite.com:4443/"
+                  "${node.unique.name}-urlprefix-grafana-${HOSTNAME_POSTFIX}/",
+                  "${node.unique.name}-urlprefix-grafana-${HOSTNAME_POSTFIX}:4443/"
                 ]
                 address_mode = "host"
                 name = "grafana"

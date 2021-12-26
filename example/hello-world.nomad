@@ -13,7 +13,7 @@ job "hello-world" {
 
       service {
          name = "hello-world-metrics"
-         port = "9001"
+         port = "9100"
          tags = ["metrics"]
          address_mode = "driver"
       }
@@ -44,7 +44,7 @@ job "hello-world" {
       }
  
       config {
-        image = "loafoe/go-hello-world:v0.4.0"
+        image = "loafoe/go-hello-world:v0.6.0"
         ports = ["http"]
       }
 
