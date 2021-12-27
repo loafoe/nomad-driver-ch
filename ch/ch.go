@@ -116,6 +116,9 @@ func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskCon
 	config := &container.Config{
 		Image:      taskConfig.Image,
 		Entrypoint: taskConfig.Entrypoint,
+		Labels: map[string]string{
+			"nomad_managed": cfg.NodeID,
+		},
 	}
 
 	var mounts []mount.Mount

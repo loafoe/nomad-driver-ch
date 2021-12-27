@@ -97,6 +97,9 @@ type Driver struct {
 
 	// logger will log to the Nomad agent
 	logger hclog.Logger
+
+	// nodeID is the ID of the current node, we use this for pruning
+	nodeID string
 }
 
 // NewPlugin returns a new example driver plugin
@@ -199,6 +202,7 @@ func (d *Driver) handleFingerprint(ctx context.Context, ch chan<- *drivers.Finge
 			// period
 			ticker.Reset(fingerprintPeriod)
 			ch <- d.buildFingerprint()
+			_ = d.stopUnmanagedContainers()
 		}
 	}
 }
@@ -237,11 +241,16 @@ func (d *Driver) buildFingerprint() *drivers.Fingerprint {
 	fp.Attributes["driver.ch.docker_client_version"] = structs.NewStringAttribute(clientVersion)
 	fp.Attributes["driver.ch.container_count"] = structs.NewIntAttribute(int64(nrContainers), "")
 	fp.Attributes["driver.ch.runtime"] = structs.NewStringAttribute(d.config.Runtime)
+	fp.Attributes["driver.ch.detected_node_id"] = structs.NewStringAttribute(d.nodeID)
 	return fp
 }
 
 // StartTask returns a task handle and a driver network if necessary.
 func (d *Driver) StartTask(cfg *drivers.TaskConfig) (*drivers.TaskHandle, *drivers.DriverNetwork, error) {
+	if d.nodeID == "" { // Capture nodeID for later use
+		d.nodeID = cfg.NodeID
+	}
+
 	if _, ok := d.tasks.Get(cfg.ID); ok {
 		return nil, nil, fmt.Errorf("task with ID %q already started", cfg.ID)
 	}
@@ -749,4 +758,36 @@ func (d *Driver) setupMirrorListeners(handle *drivers.TaskHandle, containerIP st
 		listeners = append(listeners, doneChan)
 	}
 	return listeners, nil
+}
+
+func (d *Driver) stopUnmanagedContainers() error {
+	// Find all containers not managed by us and stop them
+	if d.nodeID == "" { // Nothing to do yet
+		return nil
+	}
+	containers, err := d.dockerClient.ContainerList(d.ctx, types.ContainerListOptions{})
+	if err != nil {
+		d.logger.Error("failed to get container list for stopping", "error", err.Error())
+		return err
+	}
+	var toPrune []types.Container
+	for _, c := range containers {
+		if _, ok := c.Labels["nomad_ignore"]; ok { // Ignore all containers with label nomad_ignore
+			continue
+		}
+		if id, ok := c.Labels["nomad_managed"]; ok && id != d.nodeID { // Not a container we spun up
+			toPrune = append(toPrune, c)
+		}
+	}
+	if len(toPrune) > 0 {
+		d.logger.Info("stopping all unmanaged containers", "count", hclog.Fmt("%d", len(toPrune)))
+		for _, c := range toPrune {
+			err := d.dockerClient.ContainerStop(d.ctx, c.ID, nil)
+			if err != nil {
+				d.logger.Error("error stopping container", "containerID", c.ID, "error", err.Error())
+				continue
+			}
+		}
+	}
+	return nil
 }
