@@ -102,12 +102,12 @@ type Driver struct {
 	nodeID string
 }
 
-// NewPlugin returns a new example driver plugin
+// NewPlugin returns a new Container Host driver plugin
 func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger = logger.Named(pluginName)
 
-	return &Driver{
+	driver := &Driver{
 		eventer:        eventer.NewEventer(ctx, logger),
 		config:         &Config{},
 		tasks:          newTaskStore(),
@@ -115,6 +115,7 @@ func NewPlugin(logger hclog.Logger) drivers.DriverPlugin {
 		signalShutdown: cancel,
 		logger:         logger,
 	}
+	return driver
 }
 
 // PluginInfo returns information describing the plugin.
@@ -163,6 +164,7 @@ func (d *Driver) SetConfig(cfg *base.Config) error {
 	//
 	// Here you can use the config values to initialize any resources that are
 	// shared by all tasks that use this driver, such as a daemon process.
+	_ = d.stopUnmanagedContainers(true) // Start with a clean slate
 
 	return nil
 }
@@ -760,9 +762,14 @@ func (d *Driver) setupMirrorListeners(handle *drivers.TaskHandle, containerIP st
 	return listeners, nil
 }
 
-func (d *Driver) stopUnmanagedContainers() error {
+func (d *Driver) stopUnmanagedContainers(all ...bool) error {
+	stopAll := false
+	if len(all) > 0 {
+		stopAll = all[0]
+	}
+
 	// Find all containers not managed by us and stop them
-	if d.nodeID == "" { // Nothing to do yet
+	if d.nodeID == "" && !stopAll { // Nothing to do yet
 		return nil
 	}
 	containers, err := d.dockerClient.ContainerList(d.ctx, types.ContainerListOptions{})
@@ -775,7 +782,7 @@ func (d *Driver) stopUnmanagedContainers() error {
 		if _, ok := c.Labels["nomad_ignore"]; ok { // Ignore all containers with label nomad_ignore
 			continue
 		}
-		if id, ok := c.Labels["nomad_managed"]; ok && id != d.nodeID { // Not a container we spun up
+		if id, ok := c.Labels["nomad_managed"]; ok && (stopAll || id != d.nodeID) { // Not a container we spun up
 			toPrune = append(toPrune, c)
 		}
 	}
