@@ -772,7 +772,9 @@ func (d *Driver) stopUnmanagedContainers(all ...bool) error {
 	if d.nodeID == "" && !stopAll { // Nothing to do yet
 		return nil
 	}
-	containers, err := d.dockerClient.ContainerList(d.ctx, types.ContainerListOptions{})
+	containers, err := d.dockerClient.ContainerList(d.ctx, types.ContainerListOptions{
+		All: true,
+	})
 	if err != nil {
 		d.logger.Error("failed to get container list for stopping", "error", err.Error())
 		return err
