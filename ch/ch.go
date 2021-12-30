@@ -49,6 +49,17 @@ var nomadCopierAMD64 []byte
 //go:embed nomad-copier-arm64.tar
 var nomadCopierARM64 []byte
 
+const (
+	dockerLabelAllocID       = "com.loafoe.nomad.alloc_id"
+	dockerLabelJobName       = "com.loafoe.nomad.job_name"
+	dockerLabelJobID         = "com.loafoe.nomad.job_id"
+	dockerLabelTaskGroupName = "com.loafoe.nomad.task_group_name"
+	dockerLabelTaskName      = "com.loafoe.nomad.task_name"
+	dockerLabelNamespace     = "com.loafoe.nomad.namespace"
+	dockerLabelNodeName      = "com.loafoe.nomad.node_name"
+	dockerLabelNodeID        = "com.loafoe.nomad.node_id"
+)
+
 func (d *Driver) generateAuth(auth *RegistryAuth) string {
 	if auth == nil || auth.Username == "" {
 		return ""
@@ -117,7 +128,12 @@ func (d *Driver) initializeContainer(cfg *drivers.TaskConfig, taskConfig TaskCon
 		Image:      taskConfig.Image,
 		Entrypoint: taskConfig.Entrypoint,
 		Labels: map[string]string{
-			"nomad_managed": cfg.NodeID,
+			dockerLabelAllocID:       cfg.AllocID,
+			dockerLabelNodeID:        cfg.NodeID,
+			dockerLabelJobName:       cfg.JobName,
+			dockerLabelNodeName:      cfg.NodeName,
+			dockerLabelTaskName:      cfg.Name,
+			dockerLabelTaskGroupName: cfg.TaskGroupName,
 		},
 	}
 
