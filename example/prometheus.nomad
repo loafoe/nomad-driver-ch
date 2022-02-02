@@ -8,8 +8,9 @@ job "prometheus" {
     network {
       port "prometheus_ui" {
         static = 9090
-        to = 9090
+        to     = 9090
       }
+      port "grafana" {}
     }
 
     restart {
@@ -22,6 +23,33 @@ job "prometheus" {
     ephemeral_disk {
       size = 300
     }
+
+    task "dashboard" {
+      driver = "ch"
+
+      service {
+        tags = [
+          "${node.unique.name}-urlprefix-grafana-${HOSTNAME_POSTFIX}/",
+          "${node.unique.name}-urlprefix-grafana-${HOSTNAME_POSTFIX}:4443/"
+        ]
+        address_mode = "host"
+        name         = "grafana"
+        port         = "grafana"
+        check {
+          type     = "tcp"
+          port     = "grafana"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+      env {
+        GF_SERVER_HTTP_PORT = NOMAD_PORT_grafana
+      }
+      config {
+        image = "grafana/grafana:8.3.3"
+      }
+    }
+
 
     task "prometheus" {
       template {
@@ -72,10 +100,10 @@ EOH
 
       config {
         image = "prom/prometheus:latest"
-	args = [
-                "--config.file=/local/prometheus.yml",
-                "--enable-feature=remote-write-receiver"
-	]
+        args = [
+          "--config.file=/local/prometheus.yml",
+          "--enable-feature=remote-write-receiver"
+        ]
         mapping = [
           "shared:/prometheus"
         ]
@@ -84,9 +112,9 @@ EOH
       }
 
       service {
-        name = "prometheus"
-        tags = ["${node.unique.name}-urlprefix-/"]
-        port = "prometheus_ui"
+        name         = "prometheus"
+        tags         = ["${node.unique.name}-urlprefix-/"]
+        port         = "prometheus_ui"
         address_mode = "host"
 
         check {
