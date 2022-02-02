@@ -1,7 +1,7 @@
 # Nomad Container Host (ch) Driver Plugin
 
 This is a [Nomad](https://www.nomadproject.io) Driver plugin that allows
-HSDP Container Host instances to function as Nomad client nodes. 
+[HSDP Container Host](https://registry.terraform.io/providers/philips-software/hsdp/latest/docs/guides/container_host) instances to function as Nomad client nodes. 
 
 The initial focus is on getting things working on a single client.
 Once this is stable we will expand the scope of the project to cluster
@@ -16,9 +16,9 @@ which is much more complex and heavy weight.
 The current Container Host architecture rules out any sort of multi-tenancy
 capability of the Nomad cluster so any deployment using this driver 
 is effectively single tenant today. This is fine as there is very little overhead.
-Customers can theoretically spin up dozens of clusters. 
+Customers can theoretically spin up dozens of clusters side by side.
 Even though the driver is Container Host specific, any knowledge we gain should be
-applicable to any future hardened environment. Potentially it can also be 
+applicable to any future hardened environment. Potentially, it can also be 
 an interesting platform for on-premise or hybrid deployments.
 
 # Requirements
