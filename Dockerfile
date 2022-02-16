@@ -11,7 +11,7 @@ RUN GIT_COMMIT=$(git rev-parse --short HEAD) && \
     CGO_ENABLED=0 go build -o app -ldflags "-X main.GitCommit=${GIT_COMMIT}"
 
 
-FROM docker.na1.hsdp.io/loafoe/nomad:latest
+FROM loafoe/nomad:v1.2.6.0
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     iproute2 \
