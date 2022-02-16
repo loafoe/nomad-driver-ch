@@ -54,3 +54,7 @@ $ nomad agent -dev -config=./example/agent.hcl -plugin-dir=$(pwd)
 $ nomad run ./example/example.nomad
 $ nomad logs <ALLOCATION ID>
 ```
+
+## License
+
+Apache 2.0
