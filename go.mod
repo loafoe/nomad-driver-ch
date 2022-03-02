@@ -13,7 +13,7 @@ replace (
 )
 
 require (
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.8.0+incompatible
 	github.com/docker/docker v20.10.10+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/google/go-containerregistry v0.7.0
