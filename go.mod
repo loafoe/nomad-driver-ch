@@ -1,6 +1,6 @@
 module github.com/loafoe/nomad-driver-ch
 
-go 1.17
+go 1.18
 
 replace (
 	github.com/Microsoft/go-winio => github.com/endocrimes/go-winio v0.4.13-0.20190628114223-fb47a8b41948
