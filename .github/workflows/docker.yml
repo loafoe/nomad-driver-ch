@@ -37,5 +37,3 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: loafoe/nomad-ch,docker.na1.hsdp.io/loafoe/nomad-ch
-          cache-from: type=registry,ref=loafoe/nomad-ch:buildcache
-          cache-to: type=registry,ref=loafoe/nomad-ch:buildcache,mode=max
