@@ -18,7 +18,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/google/go-containerregistry v0.13.0
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/go-hclog v1.3.1
+	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-plugin v1.4.5
 	github.com/hashicorp/nomad v1.3.6
 	github.com/opencontainers/image-spec v1.1.0-rc2
