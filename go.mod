@@ -154,7 +154,7 @@ require (
 )
 
 require (
-	github.com/docker/cli v23.0.1+incompatible
+	github.com/docker/cli v23.0.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/fvbommel/sortorder v1.0.2 // indirect
 	github.com/moby/sys/mount v0.3.3 // indirect
