@@ -14,7 +14,7 @@ replace (
 
 require (
 	github.com/docker/distribution v2.8.1+incompatible
-	github.com/docker/docker v23.0.2+incompatible
+	github.com/docker/docker v23.0.3+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/google/go-containerregistry v0.14.0
 	github.com/google/uuid v1.3.0
