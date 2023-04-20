@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.4.9
-	github.com/hashicorp/nomad v1.5.2
+	github.com/hashicorp/nomad v1.5.3
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	golang.org/x/sys v0.6.0
 )
