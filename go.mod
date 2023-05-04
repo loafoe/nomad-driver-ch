@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.4.9
-	github.com/hashicorp/nomad v1.5.3
+	github.com/hashicorp/nomad v1.5.4
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	golang.org/x/sys v0.7.0
 )
@@ -60,7 +60,7 @@ require (
 	github.com/hashicorp/consul/api v1.18.0 // indirect
 	github.com/hashicorp/cronexpr v1.1.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-bexpr v0.1.11 // indirect
+	github.com/hashicorp/go-bexpr v0.1.12 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-immutable-radix/v2 v2.0.0 // indirect
@@ -109,7 +109,7 @@ require (
 	github.com/moby/term v0.0.0-20220808134915-39b0c02b01ae // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/runc v1.1.4 // indirect
+	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -121,10 +121,11 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/shirou/gopsutil/v3 v3.23.1 // indirect
+	github.com/shoenig/go-m1cpu v0.1.4 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/cobra v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/stretchr/testify v1.8.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/vbatts/tar-split v0.11.2 // indirect
