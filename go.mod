@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/go-plugin v1.4.9
 	github.com/hashicorp/nomad v1.5.3
 	github.com/opencontainers/image-spec v1.1.0-rc2
-	golang.org/x/sys v0.7.0
+	golang.org/x/sys v0.8.0
 )
 
 require (
