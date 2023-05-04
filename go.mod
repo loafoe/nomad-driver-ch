@@ -16,12 +16,12 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible
 	github.com/docker/docker v23.0.4+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/google/go-containerregistry v0.14.0
+	github.com/google/go-containerregistry v0.11.0
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.4.9
 	github.com/hashicorp/nomad v1.5.4
-	github.com/opencontainers/image-spec v1.1.0-rc2
+	github.com/opencontainers/image-spec v1.1.0-rc.3
 	golang.org/x/sys v0.8.0
 )
 
