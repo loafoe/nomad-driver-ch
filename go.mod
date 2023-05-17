@@ -16,7 +16,7 @@ require (
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/google/go-containerregistry v0.15.1
+	github.com/google/go-containerregistry v0.15.2
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.4.9
