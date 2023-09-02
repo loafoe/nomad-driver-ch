@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-plugin v1.5.0
 	github.com/hashicorp/nomad v1.5.6
-	github.com/opencontainers/image-spec v1.1.0-rc3
+	github.com/opencontainers/image-spec v1.1.0-rc4
 	golang.org/x/sys v0.8.0
 )
 
